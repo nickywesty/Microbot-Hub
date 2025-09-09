@@ -3,7 +3,6 @@ package net.runelite.client.plugins.microbot.autofishing;
 import net.runelite.client.config.*;
 import net.runelite.client.plugins.microbot.autofishing.enums.Fish;
 import net.runelite.client.plugins.microbot.autofishing.enums.HarpoonType;
-import net.runelite.client.plugins.microbot.autofishing.dependencies.FishingSpotLocation;
 
 @ConfigGroup("AutoFishing")
 public interface AutoFishingConfig extends Config {

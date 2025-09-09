@@ -12,7 +12,6 @@ import net.runelite.client.plugins.microbot.Script;
 import net.runelite.client.plugins.microbot.autofishing.enums.AutoFishingState;
 import net.runelite.client.plugins.microbot.autofishing.enums.Fish;
 import net.runelite.client.plugins.microbot.autofishing.enums.HarpoonType;
-import net.runelite.client.plugins.microbot.autofishing.dependencies.FishingSpotLocation;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
