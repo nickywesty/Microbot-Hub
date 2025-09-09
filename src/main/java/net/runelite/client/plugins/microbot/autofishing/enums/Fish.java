@@ -3,7 +3,6 @@ package net.runelite.client.plugins.microbot.autofishing.enums;
 import lombok.Getter;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.game.FishingSpot;
-import net.runelite.client.plugins.microbot.autofishing.dependencies.FishingSpotLocation;
 
 import java.util.ArrayList;
 import java.util.Arrays;
