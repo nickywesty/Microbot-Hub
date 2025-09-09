@@ -9,7 +9,6 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.microbot.LunarTablets.LunarTabletsPlugin;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.PluginConstants;
 import net.runelite.client.plugins.microbot.pluginscheduler.api.SchedulablePlugin;
@@ -37,7 +36,7 @@ import java.awt.*;
 )
 @Slf4j
 public class revKillerPlugin extends Plugin implements SchedulablePlugin {
-    public static final String version = "2.0.0";
+    public static final String version = "2.0.1";
     @Inject
     private revKillerConfig config;
     @Provides
