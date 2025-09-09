@@ -26,32 +26,32 @@ import java.time.Instant;
         description = "A plugin to farm the Moons of Peril",
         tags = {"bossing", "pvm", "moneymaking", "combat", "microbot"},
         authors = "The Funk",
-        version = moonsOfPerilPlugin.version,
+        version = MoonsOfPerilPlugin.version,
         minClientVersion = "2.0.0",
-        iconUrl = "https://chsami.github.io/Microbot-Hub/moonsofperil/assets/icon.png",
-        cardUrl = "https://chsami.github.io/Microbot-Hub/moonsofperil/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/MoonsOfPeril/assets/icon.png",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/MoonsOfPeril/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
-public class moonsOfPerilPlugin extends Plugin {
+public class MoonsOfPerilPlugin extends Plugin {
     static final String version = "1.0.1";
     @Inject
-    private net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig config;
+    private MoonsOfPerilConfig config;
     @Provides
-    net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig provideConfig(ConfigManager configManager) {
-        return configManager.getConfig(net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig.class);
+    MoonsOfPerilConfig provideConfig(ConfigManager configManager) {
+        return configManager.getConfig(MoonsOfPerilConfig.class);
     }
 
     @Inject
     private OverlayManager overlayManager;
     @Inject
-    private moonsOfPerilOverlay moonsOfPerilOverlay;
+    private MoonsOfPerilOverlay moonsOfPerilOverlay;
 
     @Inject
-    net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilScript moonsOfPerilScript;
+    MoonsOfPerilScript moonsOfPerilScript;
     @Inject
-    private net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig moonsOfPerilConfig;
+    private MoonsOfPerilConfig moonsOfPerilConfig;
     public static int bloodPoolTick;
     public static Instant scriptStartTime;
 

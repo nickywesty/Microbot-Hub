@@ -9,7 +9,7 @@ import net.runelite.client.plugins.microbot.moonsofperil.enums.GameObjects;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Locations;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.State;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Widgets;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
 import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
 import net.runelite.client.plugins.microbot.util.npc.Rs2Npc;
@@ -39,12 +39,12 @@ public class BlueMoonHandler implements BaseHandler {
     private static final WorldPoint AFTER_TORNADO = Locations.BLUE_ATTACK_1.getWorldPoint();
     private final int sigilNpcID = GameObjects.SIGIL_NPC_ID.getID();
     private final Rs2InventorySetup equipmentNormal;
-    private final moonsOfPerilConfig cfg;
+    private final MoonsOfPerilConfig cfg;
     private final boolean enableBoss;
     private final net.runelite.client.plugins.microbot.moonsofperil.handlers.BossHandler boss;
     private final boolean debugLogging;
 
-    public BlueMoonHandler(moonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal) {
+    public BlueMoonHandler(MoonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal) {
         this.cfg = cfg;
         this.equipmentNormal = equipmentNormal;
         this.enableBoss = cfg.enableBlue();
@@ -126,7 +126,7 @@ public class BlueMoonHandler implements BaseHandler {
     }
 
     /**  Blue Moon – Special Attack 2  (“weapon-freeze / icicle smash”)  */
-    public void specialAttack2Sequence(moonsOfPerilConfig cfg)
+    public void specialAttack2Sequence(MoonsOfPerilConfig cfg)
     {
         final int  ICICLE_NPC_ID    = NpcID.PMOON_BOSS_ICICLE_UNCRACKED;
         final int  ICICLE_ANIM_ID   = AnimationID.VFX_DJINN_BLUE_ICE_BLOCK_IDLE_02;

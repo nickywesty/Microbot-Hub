@@ -9,7 +9,7 @@ import net.runelite.client.plugins.microbot.moonsofperil.enums.GameObjects;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Locations;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.State;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Widgets;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
 import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import net.runelite.client.plugins.microbot.util.coords.Rs2LocalPoint;
 import net.runelite.client.plugins.microbot.util.npc.Rs2Npc;
@@ -44,7 +44,7 @@ public class EclipseMoonHandler implements BaseHandler {
     private final net.runelite.client.plugins.microbot.moonsofperil.handlers.BossHandler boss;
     private final boolean debugLogging;
 
-	public EclipseMoonHandler(moonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal, Rs2InventorySetup equipmentClones)
+	public EclipseMoonHandler(MoonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal, Rs2InventorySetup equipmentClones)
 	{
 		this.equipmentNormal = equipmentNormal;
 		this.equipmentClones = equipmentClones;

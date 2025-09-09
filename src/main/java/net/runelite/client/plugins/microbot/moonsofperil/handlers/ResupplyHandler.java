@@ -11,7 +11,7 @@ import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
 
 import static net.runelite.client.plugins.microbot.util.Global.sleep;
 import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
@@ -25,7 +25,7 @@ public class ResupplyHandler implements BaseHandler {
     private final WorldPoint supplyLocation = new WorldPoint(1513, 9692, 0);
     private final boolean debugLogging;
 
-    public ResupplyHandler(moonsOfPerilConfig cfg) {
+    public ResupplyHandler(MoonsOfPerilConfig cfg) {
         this.minMoonlightPotions = cfg.moonlightPotionsMinimum();
         this.minCookedBream      = cfg.cookedBreamMinimum();
         this.potionBatchSize     = cfg.moonlightPotionsQuantum();

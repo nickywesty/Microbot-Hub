@@ -10,8 +10,8 @@ import net.runelite.client.plugins.microbot.moonsofperil.enums.GameObjects;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Locations;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.State;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Widgets;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilPlugin;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilPlugin;
 import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.npc.Rs2Npc;
@@ -46,7 +46,7 @@ public class BloodMoonHandler implements BaseHandler {
     private final net.runelite.client.plugins.microbot.moonsofperil.handlers.BossHandler boss;
     private final boolean debugLogging;
 
-    public BloodMoonHandler(moonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal) {
+    public BloodMoonHandler(MoonsOfPerilConfig cfg, Rs2InventorySetup equipmentNormal) {
         this.enableBoss = cfg.enableBlood();
         this.equipmentNormal = equipmentNormal;
         this.boss = new net.runelite.client.plugins.microbot.moonsofperil.handlers.BossHandler(cfg);
@@ -192,7 +192,7 @@ public class BloodMoonHandler implements BaseHandler {
         final long TIMEOUT_MS = 30_000;
 
         while (isSpecialAttack1Sequence() && System.currentTimeMillis() - startMs < TIMEOUT_MS) {
-            int bloodPoolTick = moonsOfPerilPlugin.bloodPoolTick;
+            int bloodPoolTick = MoonsOfPerilPlugin.bloodPoolTick;
             if (targetJaguar.getAnimation() == 12492) {
                 sleep(600);
                 break;

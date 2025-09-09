@@ -7,7 +7,7 @@ import net.runelite.client.plugins.microbot.breakhandler.BreakHandlerScript;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Locations;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.State;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Widgets;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
@@ -31,7 +31,7 @@ public class RewardHandler implements BaseHandler {
     private final net.runelite.client.plugins.microbot.moonsofperil.handlers.BossHandler boss;
 
     @Inject
-    public RewardHandler(moonsOfPerilConfig cfg) {
+    public RewardHandler(MoonsOfPerilConfig cfg) {
         this.eclipseEnabled = cfg.enableEclipse();
         this.blueEnabled = cfg.enableBlue();
         this.bloodEnabled = cfg.enableBlood();

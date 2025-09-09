@@ -6,8 +6,8 @@ import net.runelite.api.gameval.NpcID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.breakhandler.BreakHandlerScript;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.State;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilScript;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilScript;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
@@ -21,11 +21,11 @@ import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
 import java.util.List;
 
 public class DeathHandler implements BaseHandler {
-    private final moonsOfPerilScript script = null;
+    private final MoonsOfPerilScript script = null;
     private final boolean shutdownOnDeath;
     private final boolean debugLogging;
 
-    public DeathHandler(moonsOfPerilConfig cfg) {
+    public DeathHandler(MoonsOfPerilConfig cfg) {
         this.shutdownOnDeath = cfg.shutdownOnDeath();
         this.debugLogging = cfg.debugLogging();
     }

@@ -7,7 +7,7 @@ import net.runelite.client.config.ConfigSection;
 import net.runelite.client.plugins.microbot.inventorysetups.InventorySetup;
 
 @ConfigGroup("perilousMoons")
-public interface moonsOfPerilConfig extends Config {
+public interface MoonsOfPerilConfig extends Config {
 
     @ConfigSection(
             name     = "General",

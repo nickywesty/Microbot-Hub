@@ -12,7 +12,7 @@ import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-public class moonsOfPerilScript extends Script {
+public class MoonsOfPerilScript extends Script {
     
 	private Rs2InventorySetup bloodEquipment;
 	private Rs2InventorySetup blueEquipment;
@@ -23,12 +23,12 @@ public class moonsOfPerilScript extends Script {
     private net.runelite.client.plugins.microbot.moonsofperil.enums.State state = net.runelite.client.plugins.microbot.moonsofperil.enums.State.IDLE;
     public static boolean test = false;
     public static volatile net.runelite.client.plugins.microbot.moonsofperil.enums.State CURRENT_STATE = net.runelite.client.plugins.microbot.moonsofperil.enums.State.IDLE;
-	private final net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig config;
+	private final MoonsOfPerilConfig config;
 
     private final Map<net.runelite.client.plugins.microbot.moonsofperil.enums.State, net.runelite.client.plugins.microbot.moonsofperil.handlers.BaseHandler> handlers = new EnumMap<>(net.runelite.client.plugins.microbot.moonsofperil.enums.State.class);
 
 	@Inject
-	public moonsOfPerilScript(moonsOfPerilConfig config) {
+	public MoonsOfPerilScript(MoonsOfPerilConfig config) {
 		this.config = config;
 	}
 

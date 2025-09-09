@@ -5,7 +5,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.ObjectID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.moonsofperil.enums.Widgets;
-import net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilConfig;
+import net.runelite.client.plugins.microbot.moonsofperil.MoonsOfPerilConfig;
 import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
@@ -30,7 +30,7 @@ public final class BossHandler {
     private final int prayerPercentage;
     private final boolean debugLogging;
 
-    public BossHandler(moonsOfPerilConfig cfg) {
+    public BossHandler(MoonsOfPerilConfig cfg) {
         this.healthPercentage = cfg.healthPercentage();
         this.prayerPercentage = cfg.prayerPercentage();
         this.debugLogging = cfg.debugLogging();

@@ -12,11 +12,11 @@ import java.awt.*;
 import java.time.Instant;
 import java.time.Duration;
 
-public class moonsOfPerilOverlay extends OverlayPanel {
+public class MoonsOfPerilOverlay extends OverlayPanel {
     private Instant startTime;
 
     @Inject
-    moonsOfPerilOverlay(net.runelite.client.plugins.microbot.moonsofperil.moonsOfPerilPlugin plugin)
+    MoonsOfPerilOverlay(MoonsOfPerilPlugin plugin)
     {
         super(plugin);
         setPosition(OverlayPosition.TOP_LEFT);
@@ -43,13 +43,13 @@ public class moonsOfPerilOverlay extends OverlayPanel {
                     .build());
 
             panelComponent.getChildren().add(LineComponent.builder()
-                    .left("State: " + moonsOfPerilScript.CURRENT_STATE)
+                    .left("State: " + MoonsOfPerilScript.CURRENT_STATE)
                     .build());
 
             // Runtime section
             panelComponent.getChildren().add(LineComponent.builder()
                     .left("Session Time:")
-                    .right(formatDuration(Duration.between(moonsOfPerilPlugin.scriptStartTime, Instant.now())))
+                    .right(formatDuration(Duration.between(MoonsOfPerilPlugin.scriptStartTime, Instant.now())))
                     .rightColor(new Color(255, 215, 0)) // Gold
                     .build());
 
