@@ -1,8 +1,6 @@
 package net.runelite.client.plugins.microbot.natehumidifier;
 
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierPlugin;
-import net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierScript;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -12,28 +10,27 @@ import javax.inject.Inject;
 import java.awt.*;
 
 
-
 public class HumidifierOverlay extends OverlayPanel {
 
     @Inject
-    HumidifierOverlay(HumidifierPlugin plugin)
-    {
+    HumidifierOverlay(HumidifierPlugin plugin) {
         super(plugin);
         setPosition(OverlayPosition.TOP_LEFT);
         setNaughty();
     }
+
     @Override
     public Dimension render(Graphics2D graphics) {
         try {
 
             panelComponent.setPreferredSize(new Dimension(275, 800));
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Nate's Humidifier V" + net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierScript.version)
+                    .text("Nate's Humidifier V" + HumidifierPlugin.version)
                     .color(Color.magenta)
                     .build());
 
             panelComponent.getChildren().add(LineComponent.builder()
-                    .left(net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierScript.itemsProcessedMessage)
+                    .left(HumidifierScript.itemsProcessedMessage)
                     .build());
 
             panelComponent.getChildren().add(LineComponent.builder()
@@ -45,7 +42,7 @@ public class HumidifierOverlay extends OverlayPanel {
                     .build());
 
 
-        } catch(Exception ex) {
+        } catch (Exception ex) {
             Microbot.logStackTrace(this.getClass().getSimpleName(), ex);
         }
         return super.render(graphics);

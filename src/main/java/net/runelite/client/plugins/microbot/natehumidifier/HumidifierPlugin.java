@@ -6,9 +6,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierConfig;
-import net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierOverlay;
-import net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierScript;
+import net.runelite.client.plugins.microbot.PluginConstants;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
@@ -16,15 +14,22 @@ import java.awt.*;
 
 
 @PluginDescriptor(
-        name = PluginDescriptor.Nate +"Humidifier",
+        name = PluginDescriptor.Nate + "Humidifier",
         description = "Nate's Humidifier",
-        tags = {"magic", "nate", "humidifier","moneymaking"},
-        enabledByDefault = false
+        tags = {"magic", "nate", "humidifier", "moneymaking"},
+        authors = {""},
+        version = HumidifierPlugin.version,
+        minClientVersion = "2.0.6",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/HumidifierPlugin/assets/icon.png",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/HumidifierPlugin/assets/card.png",
+        enabledByDefault = PluginConstants.DEFAULT_ENABLED,
+        isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class HumidifierPlugin extends Plugin {
+    final static String version = "1.6.2";
     @Inject
-    private net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierConfig config;
+    private HumidifierConfig config;
     @Inject
     private OverlayManager overlayManager;
     @Inject
@@ -34,14 +39,14 @@ public class HumidifierPlugin extends Plugin {
     HumidifierScript humidifierScript;
 
     @Provides
-    net.runelite.client.plugins.microbot.nateplugins.moneymaking.natehumidifier.HumidifierConfig provideConfig(ConfigManager configManager) {
+    HumidifierConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(HumidifierConfig.class);
     }
 
 
     @Override
     protected void startUp() throws AWTException {
-		Microbot.pauseAllScripts.compareAndSet(true, false);
+        Microbot.pauseAllScripts.compareAndSet(true, false);
         if (overlayManager != null) {
             overlayManager.add(humidifierOverlay);
         }
