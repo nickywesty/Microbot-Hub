@@ -1,5 +1,6 @@
 package net.runelite.client.plugins.microbot.aiocamdozaal;
 
+import net.runelite.api.Point;
 import net.runelite.api.Skill;
 import net.runelite.api.WallObject;
 import net.runelite.api.coords.LocalPoint;
@@ -29,6 +30,7 @@ import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
+import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,7 +73,7 @@ public class AIOCamdozScript extends Script {
 
     public boolean run(AIOCamdozConfig config) {
         Microbot.enableAutoRunOn = false;
-        CUtil.SetMyAntiban(0.08, 2, 15, 0.6);
+        SetMyAntiban(0.08, 2, 15, 0.6);
         state = State.WALKING_TO_BANK;
 
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
@@ -764,5 +766,34 @@ public class AIOCamdozScript extends Script {
                 targetFishingAnimationID = AnimationID.HUMAN_LARGENET;
                 break;
         }
+    }
+
+    private static void SetMyAntiban(double _microbreakChance, int _mbreakDurationLow, int _mbreakDurationHigh, double _actionCooldownChance)
+    {
+        Rs2Antiban.resetAntibanSettings();
+
+        Rs2AntibanSettings.antibanEnabled = true;
+        Rs2AntibanSettings.usePlayStyle = true;
+        Rs2AntibanSettings.randomIntervals = true;
+        Rs2AntibanSettings.simulateFatigue = true;
+        Rs2AntibanSettings.simulateAttentionSpan = true;
+        Rs2AntibanSettings.behavioralVariability = true;
+        Rs2AntibanSettings.nonLinearIntervals = true;
+        Rs2AntibanSettings.dynamicIntensity = false;
+        Rs2AntibanSettings.dynamicActivity = false;
+        Rs2AntibanSettings.naturalMouse = true;
+        Rs2AntibanSettings.simulateMistakes = true;
+        Rs2AntibanSettings.moveMouseOffScreen = true;
+        Rs2AntibanSettings.moveMouseRandomly = true;
+        Rs2AntibanSettings.moveMouseRandomlyChance = 0.1;
+        Rs2AntibanSettings.takeMicroBreaks = true;
+        Rs2AntibanSettings.microBreakDurationLow = _mbreakDurationLow;
+        Rs2AntibanSettings.microBreakDurationHigh = _mbreakDurationHigh;
+        Rs2AntibanSettings.microBreakChance = _microbreakChance;
+
+        Rs2AntibanSettings.contextualVariability = true;
+        Rs2AntibanSettings.actionCooldownChance = _actionCooldownChance;
+
+        Rs2AntibanSettings.devDebug = false;
     }
 }
