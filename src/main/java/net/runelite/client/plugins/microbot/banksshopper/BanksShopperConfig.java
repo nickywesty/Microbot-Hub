@@ -4,8 +4,7 @@ import net.runelite.client.config.*;
 
 @ConfigGroup(BanksShopperConfig.configGroup)
 @ConfigInformation(
-        description =
-                "The Banks Shopper plugin automates buying and selling items from NPC shops.<br>" +
+        "The Banks Shopper plugin automates buying and selling items from NPC shops.<br>" +
                 "Features include:<br>" +
                 "<ul>" +
                 "<li>Set buy/sell mode and quantity.</li>" +

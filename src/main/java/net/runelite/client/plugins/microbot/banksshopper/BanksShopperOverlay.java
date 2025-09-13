@@ -1,9 +1,6 @@
 package net.runelite.client.plugins.microbot.banksshopper;
 
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperConfig;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperPlugin;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperScript;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -13,12 +10,10 @@ import javax.inject.Inject;
 import java.awt.*;
 
 public class BanksShopperOverlay extends OverlayPanel {
-    private final net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperConfig config;
 
     @Inject
     BanksShopperOverlay(BanksShopperPlugin plugin, BanksShopperConfig config) {
         super(plugin);
-        this.config = config;
         setPosition(OverlayPosition.TOP_LEFT);
         setNaughty();
     }

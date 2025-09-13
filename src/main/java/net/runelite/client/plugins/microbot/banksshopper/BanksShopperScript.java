@@ -2,9 +2,6 @@ package net.runelite.client.plugins.microbot.banksshopper;
 
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.Actions;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperConfig;
-import net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperPlugin;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
