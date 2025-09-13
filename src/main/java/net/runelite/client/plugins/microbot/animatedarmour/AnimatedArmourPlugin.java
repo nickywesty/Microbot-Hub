@@ -15,10 +15,10 @@ import java.awt.*;
         name = PluginDescriptor.See1Duck + "Animated Armour Killer & ",
         description = "Builds, Kills, and loots animated armour and warrior guild tokens.",
         tags = {"animated armour", "microbot", "warrior guild"},
-        authors = {"Bolado"},
+        authors = {"See1Duck"},
         version = AnimatedArmourPlugin.version,
         minClientVersion = "2.0.7",
-        cardUrl = "https://chsami.github.io/Microbot-Hub/AnonymousPlugin/assets/card.png",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AnimatedArmourPlugin/assets/card.png",
         iconUrl = "https://chsami.github.io/Microbot-Hub/AnimatedArmourPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
@@ -26,7 +26,7 @@ import java.awt.*;
 @Slf4j
 public class AnimatedArmourPlugin extends Plugin {
 
-    static final String version = "1.0.0";
+    static final String version = "1.0.1";
     @Inject
     private AnimatedArmourConfig config;
 
