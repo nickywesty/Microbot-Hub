@@ -9,10 +9,6 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.bee.GEBotRecruiter.RecruiterConfig;
-import net.runelite.client.plugins.microbot.bee.GEBotRecruiter.RecruiterOverlay;
-import net.runelite.client.plugins.microbot.bee.GEBotRecruiter.RecruiterScript;
-import net.runelite.client.plugins.microbot.crafting.CraftingPlugin;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;

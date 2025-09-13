@@ -6,7 +6,6 @@ import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
-import net.runelite.client.plugins.microbot.bee.GEBotRecruiter.RecruiterConfig;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.menu.NewMenuEntry;
@@ -144,7 +143,7 @@ public class RecruiterScript extends Script {
                     }
                 }
 
-                if (config.sendMessage() && !config.recruit()){
+                if (config.sendMessage() && !config.recruit()) {
                     final Random random = new Random();
 
                     System.out.println("entering loop sleep");
@@ -185,19 +184,19 @@ public class RecruiterScript extends Script {
     }
 
     public void sendMessage(String message) {
-            if (message.length() > 80) {
-                message = message.substring(0, 80);
-            }
-            System.out.println("Sending message: " + message);
-
-            // Type the message in the chatbox
-            Rs2Keyboard.typeString(message);
-
-            // Press Enter to send the message
-            Rs2Keyboard.enter();
-
-            sleep(1000);
+        if (message.length() > 80) {
+            message = message.substring(0, 80);
         }
+        System.out.println("Sending message: " + message);
+
+        // Type the message in the chatbox
+        Rs2Keyboard.typeString(message);
+
+        // Press Enter to send the message
+        Rs2Keyboard.enter();
+
+        sleep(1000);
+    }
 
     public void inviteToClanWithRetry(String playerName) {
         for (int attempt = 0; attempt < 3; attempt++) {
