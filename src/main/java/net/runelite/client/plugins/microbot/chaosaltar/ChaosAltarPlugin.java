@@ -24,7 +24,7 @@ import javax.inject.Inject;
         name = PluginDescriptor.Bee + "Chaos Altar",
         description = "Automates bone offering at the Chaos Altar",
         tags = {"prayer", "bones", "altar"},
-        authors = {"Mocrosoft"},
+        authors = {"Bee"},
         version = ChaosAltarPlugin.version,
         minClientVersion = "2.0.7",
         cardUrl = "https://chsami.github.io/Microbot-Hub/ChaosAltarPlugin/assets/card.jpg",
