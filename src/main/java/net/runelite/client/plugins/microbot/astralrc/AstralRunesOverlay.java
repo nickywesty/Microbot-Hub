@@ -10,12 +10,10 @@ import javax.inject.Inject;
 import java.awt.*;
 
 public class AstralRunesOverlay extends OverlayPanel {
-    private final AstralRunesConfig config;
 
     @Inject
     AstralRunesOverlay(AstralRunesPlugin plugin, AstralRunesConfig config) {
         super(plugin);
-        this.config = config;
         setPosition(OverlayPosition.TOP_LEFT);
         setNaughty();
     }
@@ -25,7 +23,7 @@ public class AstralRunesOverlay extends OverlayPanel {
         try {
             panelComponent.setPreferredSize(new Dimension(200, 300));
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Astral Runes " + net.runelite.client.plugins.microbot.maxxin.astralrc.AstralRunesScript.version)
+                    .text("Astral Runes " + AstralRunesPlugin.version)
                     .color(Color.GREEN)
                     .build());
 
@@ -37,7 +35,7 @@ public class AstralRunesOverlay extends OverlayPanel {
             if( getPlugin() instanceof AstralRunesPlugin) {
                 var plugin = (AstralRunesPlugin) getPlugin();
                 panelComponent.getChildren().add(LineComponent.builder()
-                        .left("Total Trips: " + net.runelite.client.plugins.microbot.maxxin.astralrc.AstralRunesScript.totalTrips)
+                        .left("Total Trips: " + AstralRunesScript.totalTrips)
                         .build());
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("Total Runes: " + AstralRunesScript.runesForSession)
