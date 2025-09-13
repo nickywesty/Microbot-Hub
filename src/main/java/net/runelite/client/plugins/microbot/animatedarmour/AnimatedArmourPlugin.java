@@ -17,7 +17,7 @@ import java.awt.*;
         tags = {"animated armour", "microbot", "warrior guild"},
         authors = {"Bolado"},
         version = AnimatedArmourPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         cardUrl = "https://chsami.github.io/Microbot-Hub/AnonymousPlugin/assets/card.png",
         iconUrl = "https://chsami.github.io/Microbot-Hub/AnimatedArmourPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

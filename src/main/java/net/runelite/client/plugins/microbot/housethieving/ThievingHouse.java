@@ -2,8 +2,7 @@ package net.runelite.client.plugins.microbot.housethieving;
 
 import net.runelite.api.coords.WorldPoint;
 
-import static HouseThievingConstants.*;
-
+import static net.runelite.client.plugins.microbot.housethieving.HouseThievingConstants.*;
 
 public enum ThievingHouse {
     LAVINIA(

@@ -25,7 +25,7 @@ import java.awt.*;
         tags = {"astral", "rune", "microbot"},
         authors = { "Maxxin" },
         version = AstralRunesPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/AstralRunesPlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/AstralRunesPlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

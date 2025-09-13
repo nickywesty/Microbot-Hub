@@ -7,7 +7,6 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.natehumidifier.HumidifierPlugin;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
@@ -21,7 +20,7 @@ import java.awt.*;
         tags = {"MoneyMaking", "nate", "pies"},
         authors = {"Nate"},
         version = PiePlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/PiePlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/PiePlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

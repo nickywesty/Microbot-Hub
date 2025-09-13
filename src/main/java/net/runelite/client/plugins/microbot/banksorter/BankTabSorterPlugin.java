@@ -24,7 +24,7 @@ import java.awt.event.MouseEvent;
         tags = {"bank", "sort", "microbot", "tab"},
         authors = {"unknown"},
         version = BankTabSorterPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/BanksShopperPlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/BanksShopperPlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

@@ -18,7 +18,7 @@ import java.awt.*;
         tags = {"thieving", "house thieving"},
         authors = {"Maxxin"},
         version = HouseThievingPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/HouseThievingPlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/HouseThievingPlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

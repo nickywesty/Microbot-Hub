@@ -23,7 +23,7 @@ import java.awt.*;
         name = PluginDescriptor.Nate + "Arrow Maker",
         description = "Nate's Arrow Maker",
         tags = {"MoneyMaking", "nate", "Arrow"},
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         authors = {"Nate"},
         version = ArrowPlugin.version,
         cardUrl = "https://chsami.github.io/Microbot-Hub/ArrowPlugin/assets/card.png",

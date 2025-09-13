@@ -24,7 +24,7 @@ import java.util.Arrays;
         tags = {"bankstander", "bank.js", "bank", "eXioStorm", "storm"},
         authors = {"Bankjs"},
         version = BanksBankStanderPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/BanksBankStanderPlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/BanksBankStanderPlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

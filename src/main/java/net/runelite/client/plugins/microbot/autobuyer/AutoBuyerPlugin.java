@@ -22,7 +22,7 @@ import java.awt.*;
         tags = {"buy", "buyer", "grand exchange", "ge"},
         authors = {"Acun"},
         version = AutoBuyerPlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         cardUrl = "https://chsami.github.io/Microbot-Hub/AutoBuyerPlugin/assets/card.png",
         iconUrl = "https://chsami.github.io/Microbot-Hub/AutoBuyerPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,

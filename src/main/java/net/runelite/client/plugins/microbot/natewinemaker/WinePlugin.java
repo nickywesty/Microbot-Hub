@@ -22,7 +22,7 @@ import java.awt.*;
         tags = {"skilling", "nate", "wine", "cooking"},
         authors = {"Nate"},
         version = WinePlugin.version,
-        minClientVersion = "2.0.6",
+        minClientVersion = "2.0.7",
         iconUrl = "https://chsami.github.io/Microbot-Hub/WinePlugin/assets/icon.png",
         cardUrl = "https://chsami.github.io/Microbot-Hub/WinePlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
