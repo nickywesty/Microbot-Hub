@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 )
 @Slf4j
 public class BanksShopperPlugin extends Plugin {
-    final static String version = "1.0.0";
+    public final static String version = "1.4.0";
     @Inject
     private BanksShopperConfig config;
 

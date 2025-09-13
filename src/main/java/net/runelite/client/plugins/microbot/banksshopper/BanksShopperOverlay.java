@@ -23,7 +23,7 @@ public class BanksShopperOverlay extends OverlayPanel {
         try {
             panelComponent.setPreferredSize(new Dimension(200, 300));
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Bank's Shopper V" + BanksShopperScript.version)
+                    .text("Bank's Shopper V" + BanksShopperPlugin.version)
                     .color(Color.GREEN)
                     .build());
 

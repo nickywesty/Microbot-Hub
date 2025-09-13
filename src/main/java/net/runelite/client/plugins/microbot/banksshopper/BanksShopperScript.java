@@ -21,9 +21,7 @@ enum ShopperState {
 
 public class BanksShopperScript extends Script {
 
-    public static String version = "1.4.0";
-
-    private final net.runelite.client.plugins.microbot.bankjs.BanksShopper.BanksShopperPlugin plugin;
+    private final BanksShopperPlugin plugin;
     private ShopperState state = ShopperState.SHOPPING;
 
     public BanksShopperScript(final BanksShopperPlugin plugin) {

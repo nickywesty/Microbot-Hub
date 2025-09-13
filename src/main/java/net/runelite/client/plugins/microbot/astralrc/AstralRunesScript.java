@@ -8,6 +8,7 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
+import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import net.runelite.client.plugins.microbot.maxxin.MXUtil;
 import net.runelite.client.plugins.microbot.util.Rs2InventorySetup;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
@@ -16,10 +17,13 @@ import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
+import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 import net.runelite.client.plugins.microbot.util.magic.*;
 import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
+import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
+import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -129,7 +133,7 @@ public class AstralRunesScript extends Script {
                                 Rs2Bank.closeBank();
                             }
 
-                            MXUtil.closeWorldMapIfNeeded();
+                            closeWorldMapIfNeeded();
                             if( Rs2Magic.hasRequiredRunes(Rs2Spells.NPC_CONTACT) ) {
                                 Rs2Magic.repairPouchesWithLunar();
                                 Rs2Inventory.checkPouches();
@@ -153,7 +157,7 @@ public class AstralRunesScript extends Script {
                             return;
                         }
 
-                        MXUtil.closeWorldMapIfNeeded();
+                        closeWorldMapIfNeeded();
 
                         if( !Rs2Bank.isOpen() ) {
                             if( playerLoc.distanceTo(LUNAR_ISLE_BANK_WORLD_POINT) > 20 ) {
@@ -162,7 +166,7 @@ public class AstralRunesScript extends Script {
                                 Rs2Walker.walkFastCanvas(LUNAR_ISLE_BANK_WORLD_POINT_AFTER_TELEPORT);
                             }
 
-                            MXUtil.switchInventoryTabIfNeeded();
+                            switchInventoryTabIfNeeded();
                             var bankTileLoc = !dreamMentorComplete ? SEAL_OF_PASSAGE_BANKER : DREAM_MENTOR_BANKER;
                             TileObject bankTile = Rs2GameObject.getGameObject(bankTileLoc);
                             Rs2Walker.walkFastCanvas(LUNAR_ISLE_BANK_WORLD_POINT);
@@ -240,7 +244,7 @@ public class AstralRunesScript extends Script {
                             Rs2Inventory.waitForInventoryChanges(200);
                         }
 
-                        MXUtil.handlePouchOutOfSync(hasEmptySlots, colossalPouch);
+                        handlePouchOutOfSync(hasEmptySlots, colossalPouch);
 
                         if( !Rs2Inventory.hasDegradedPouch() && Rs2Inventory.allPouchesFull() && Rs2Inventory.emptySlotCount() < 1 ) {
                             state = State.CRAFTING;
@@ -253,10 +257,10 @@ public class AstralRunesScript extends Script {
                             return;
                         }
                         plugin.setDebugText1("distance to craft - " + distToCraftPoint);
-                        MXUtil.closeWorldMapIfNeeded();
+                        closeWorldMapIfNeeded();
                         if( distToCraftPoint >= 3 && !Rs2Player.isMoving() ) {
                             Rs2Walker.walkTo(LUNAR_ISLE_CRAFT_WORLD_POINT, 2);
-                            MXUtil.closeWorldMapIfNeeded();
+                            closeWorldMapIfNeeded();
                             doAltarCraft();
                         }
 
@@ -305,7 +309,7 @@ public class AstralRunesScript extends Script {
         }
 
         if(!canCastMoonclanTeleport) {
-            MXUtil.switchInventoryTabIfNeeded();
+            switchInventoryTabIfNeeded();
             if(!openBank()){
                 Microbot.showMessage("Failed to open bank for auto setup! Move closer to a bank or disable auto setup in config");
                 return false;
@@ -447,6 +451,41 @@ public class AstralRunesScript extends Script {
         );
     }
 
+    private void handlePouchOutOfSync(boolean hasEmptySlots, Rs2ItemModel colossalPouch) {
+        if( Rs2Bank.isOpen() && !hasEmptySlots && !Rs2Inventory.allPouchesFull() ) {
+            if( Rs2Inventory.anyPouchUnknown() ) {
+                Rs2Inventory.checkPouches();
+                Rs2Inventory.waitForInventoryChanges(200);
+            }
+            var emptySlots = Rs2Inventory.getEmptySlots();
+            Rs2Inventory.interact(colossalPouch, "Fill");
+            var nextEmptySlots = Rs2Inventory.getEmptySlots();
+            // Handle edge case where pouch goes out-of-sync
+            if( !Rs2Inventory.waitForInventoryChanges(400) || emptySlots == nextEmptySlots ) {
+                Rs2Bank.closeBank();
+                sleep(800);
+                Rs2Inventory.interact(colossalPouch, "Check");
+                sleep(800);
+            }
+        }
+    }
+
+    private static void switchInventoryTabIfNeeded() {
+        if( Rs2Tab.getCurrentTab() != InterfaceTab.INVENTORY ) {
+            Rs2Tab.switchToInventoryTab();
+            sleepUntil(() -> Rs2Tab.getCurrentTab() == InterfaceTab.INVENTORY);
+        }
+    }
+
+    private static void closeWorldMapIfNeeded() {
+        var worldMapOpen = Rs2Widget.findWidget("Game features") != null;
+        if( worldMapOpen ) {
+            var exitButton = Rs2Widget.findWidget(539, null);
+            if( exitButton != null ) {
+                Rs2Widget.clickWidget(exitButton);
+            }
+        }
+    }
     @Override
     public void shutdown() {
 		canCastMoonclanTeleport = false;
