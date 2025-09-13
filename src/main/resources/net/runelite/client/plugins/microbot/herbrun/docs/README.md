@@ -1,111 +1,49 @@
-﻿# Auto Bank Stander Plugin
+﻿# Herbrun Plugin
 
-The **Auto Bank Stander Plugin** is an all-in-one automation tool for Old School RuneScape, designed to efficiently perform a wide variety of bank-standing skilling and processing activities. Built for the Microbot RuneLite client, this plugin automates repetitive tasks such as alching, herblore, fletching, and more, allowing for hands-free and optimized experience gains while standing at a bank.
+The **Herbrun Plugin** is a RuneLite plugin for the Microbot framework that automates herb farming runs in Old School RuneScape (OSRS). It is designed to help players efficiently manage and complete herb runs by automating patch navigation, planting, composting, and harvesting.
 
 ---
 
 ## Features
 
-- **Automated Skilling and Processing:**  
-  Supports a range of bank-standing activities, including:
-    - Magic (e.g., alching, enchanting)
-    - Herblore (cleaning herbs, making unfinished/finished potions)
-    - Fletching (stringing bows, making darts/bolts/arrows)
-    - Bolt enchanting and other processing tasks
-
-- **Configurable Skill Modes:**  
-  Easily select your desired skill and processing method through the plugin panel or configuration.
-
-- **Inventory and Resource Management:**  
-  Automatically withdraws required items from the bank, manages inventory space, and ensures you always have the necessary supplies.
-
-- **Overlay and Sidebar Panel:**  
-  Provides a user-friendly sidebar panel for starting/stopping scripts, selecting modes, and monitoring status.
-
-- **Failsafes and Error Handling:**  
-  Handles running out of supplies, full inventory, or unexpected in-game events.
-
-- **Extensible and Modular:**  
-  Designed with modular actions and configuration, making it easy to add support for new bank-standing activities.
+- **Automated Herb Runs:** Automatically travels to all configured herb patches, plants seeds, applies compost, and harvests grown herbs.
+- **Customizable Patch Selection:** Choose which herb patches to include in your run.
+- **Compost Support:** Select the type of compost (regular, super, or ultra) to use on each patch.
+- **Seed Selection:** Configure which herb seeds to plant at each patch.
+- **Overlay Display:** Shows real-time status and progress of your herb run in an in-game overlay.
+- **Safe Start/Stop:** Easily start or stop the script from the sidebar panel.
 
 ---
 
 ## How It Works
 
-1. **Configuration:**  
-   Select your desired skill and processing method in the plugin panel or configuration.
-
-2. **Startup:**  
-   The plugin prepares the required configuration and waits for you to start the script from the sidebar panel.
-
-3. **Automation Loop:**  
-   The script performs the selected activity, manages inventory, interacts with the bank, and repeats the process for continuous training or processing.
-
-4. **Overlay/Panel:**  
-   Displays real-time information such as:
-    - Current skill and method
-    - Status (Running/Stopped)
-    - Actions performed
-
-5. **Failsafes:**  
-   Pauses or stops if requirements are not met, or if unexpected events occur.
-
----
-
-## Configuration
-
-The plugin provides a configuration panel where you can:
-
-- Select the skill to train (Magic, Herblore, Fletching, etc.)
-- Choose the specific method or item to process
-- Enable or disable overlay features
-- Adjust advanced options (e.g., use of Amulet of Chemistry, bolt type, potion type)
+1. **Configure:** Set your preferences in the plugin configuration (patches, compost type, seed type, etc.).
+2. **Start:** Enable the plugin and start the script from the sidebar.
+3. **Automate:** The script will:
+    - Travel to each selected herb patch
+    - Apply the chosen compost
+    - Plant the selected herb seed
+    - Harvest herbs when grown
+    - Display current status in the overlay
+4. **Stop:** You can stop the script at any time from the panel.
 
 ---
 
 ## Requirements
 
 - Microbot RuneLite client
-- Sufficient skill level for the selected activity
-- Required items in the bank/inventory
+- Required seeds, compost, and teleport items for your chosen patches
 
 ---
 
-## Usage
+## Disclaimer
 
-1. **Enable the Plugin:**  
-   Open the Microbot sidebar, find the Auto Bank Stander Plugin, and enable it.
-
-2. **Configure Settings:**  
-   Select your desired skill and processing method.
-
-3. **Start the Script:**  
-   Use the sidebar panel to start the automation.
-
-4. **Monitor Progress:**  
-   Watch the panel for real-time updates on status and actions.
-
-5. **Stop at Any Time:**  
-   Use the panel to halt the automation.
+- This plugin is for educational and research purposes only.
+- Use at your own risk. Automation may violate the OSRS game rules and could result in account penalties.
+- The developers are not responsible for any consequences resulting from the use of this plugin.
 
 ---
 
-## Limitations
+## Feedback
 
-- Only supports activities and items defined in the script logic.
-- Requires the player to have the necessary items and skill levels.
-- May not handle all random events or interruptions (e.g., player death, aggressive NPCs).
-
----
-
-## Source Files
-
-- `AutoBankStanderPlugin.java` – Main plugin class, manages lifecycle and integration.
-- `AutoBankStanderScript.java` – Core automation logic for bank-standing activities.
-- `AutoBankStanderConfig.java` – User configuration options.
-- `AutoBankStanderPanel.java` – Sidebar panel for user interaction.
-- `config/ConfigData.java` – Configuration data structure.
-
----
-
-**Automate your bank-standing skilling and processing with the Auto Bank Stander Plugin for maximum efficiency!**
+For issues or suggestions, please open an issue or contribute via the Microbot Hub repository.
