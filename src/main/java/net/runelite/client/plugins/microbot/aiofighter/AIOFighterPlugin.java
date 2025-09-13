@@ -52,17 +52,17 @@ import java.util.stream.Collectors;
         name = PluginDescriptor.Mocrosoft + "AIO Fighter",
         authors = { "Mocrosoft", "See1Duck" },
         version = AIOFighterPlugin.version,
-        minClientVersion = "1.9.6",
+        minClientVersion = "2.0.7",
         description = "Microbot AIO Fighter plugin",
         tags = {"fight", "microbot", "misc", "combat", "playerassistant"},
-        cardUrl = "https://chsami.github.io/Microbot-Hub/AnonymousPlugin/assets/card.png",
-        iconUrl = "https://chsami.github.io/Microbot-Hub/AnonymousPlugin/assets/icon.png",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/AIOFighterPlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/AIOFighterPlugin/assets/icon.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
 @Slf4j
 public class AIOFighterPlugin extends Plugin {
-    public static final String version = "2.0.3 BETA";
+    public static final String version = "2.0.4";
     public static boolean needShopping = false;
     private static final String SET = "Set";
     private static final String CENTER_TILE = ColorUtil.wrapWithColorTag("Center Tile", JagexColors.MENU_TARGET);
