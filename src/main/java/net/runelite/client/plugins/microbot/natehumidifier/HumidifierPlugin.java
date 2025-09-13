@@ -17,7 +17,7 @@ import java.awt.*;
         name = PluginDescriptor.Nate + "Humidifier",
         description = "Nate's Humidifier",
         tags = {"magic", "nate", "humidifier", "moneymaking"},
-        authors = {""},
+        authors = {"Nate"},
         version = HumidifierPlugin.version,
         minClientVersion = "2.0.6",
         iconUrl = "https://chsami.github.io/Microbot-Hub/HumidifierPlugin/assets/icon.png",
