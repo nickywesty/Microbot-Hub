@@ -23,8 +23,8 @@ import java.awt.*;
         authors = {"Nate"},
         version = WinePlugin.version,
         minClientVersion = "2.0.6",
-        iconUrl = "https://chsami.github.io/Microbot-Hub/PiePlugin/assets/icon.png",
-        cardUrl = "https://chsami.github.io/Microbot-Hub/PiePlugin/assets/card.png",
+        iconUrl = "https://chsami.github.io/Microbot-Hub/WinePlugin/assets/icon.png",
+        cardUrl = "https://chsami.github.io/Microbot-Hub/WinePlugin/assets/card.png",
         enabledByDefault = PluginConstants.DEFAULT_ENABLED,
         isExternal = PluginConstants.IS_EXTERNAL
 )
