@@ -9,10 +9,6 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.autobankstander.AutoBankStanderPlugin;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderConfig;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderOverlay;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
@@ -51,7 +47,7 @@ public class BanksBankStanderPlugin extends Plugin {
     private BanksBankStanderOverlay banksBankStanderOverlay;
 
     @Inject
-    net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript banksBankStanderScript;
+    BanksBankStanderScript banksBankStanderScript;
 
 
     @Override
@@ -66,25 +62,25 @@ public class BanksBankStanderPlugin extends Plugin {
     public void onItemContainerChanged(ItemContainerChanged inventory){
         if(inventory.getContainerId()==93){
             if (!Rs2Bank.isOpen()) {
-                net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.itemsProcessed++;
+                BanksBankStanderScript.itemsProcessed++;
             }
-            if (net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.secondItemId != null) { // Use secondItemId if it's available
+            if (BanksBankStanderScript.secondItemId != null) { // Use secondItemId if it's available
                 if (Arrays.stream(inventory.getItemContainer().getItems())
-                        .anyMatch(x -> x.getId() == net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.secondItemId)) {
+                        .anyMatch(x -> x.getId() == BanksBankStanderScript.secondItemId)) {
                     // average is 1800, max is 2400~
-                    net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.previousItemChange = System.currentTimeMillis();
+                    BanksBankStanderScript.previousItemChange = System.currentTimeMillis();
                     //System.out.println("still processing items");
                 } else {
-                    net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.previousItemChange = (System.currentTimeMillis() - 2500);
+                    BanksBankStanderScript.previousItemChange = (System.currentTimeMillis() - 2500);
                 }
             } else { // Use secondItemIdentifier if secondItemId is null
                 Rs2ItemModel item = Rs2Inventory.get(config.secondItemIdentifier());
                 if (item != null) {
                     // average is 1800, max is 2400~
-                    net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.previousItemChange = System.currentTimeMillis();
+                    BanksBankStanderScript.previousItemChange = System.currentTimeMillis();
                     //System.out.println("still processing items");
                 } else {
-                    net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.previousItemChange = (System.currentTimeMillis() - 2500);
+                    BanksBankStanderScript.previousItemChange = (System.currentTimeMillis() - 2500);
                 }
             }
         }
@@ -92,7 +88,7 @@ public class BanksBankStanderPlugin extends Plugin {
     @Subscribe
     public void onWidgetLoaded(WidgetLoaded widget){
         if (widget.getGroupId()==270) {
-            if(net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.isWaitingForPrompt) {
+            if(BanksBankStanderScript.isWaitingForPrompt) {
                 BanksBankStanderScript.isWaitingForPrompt = false;
             }
         }

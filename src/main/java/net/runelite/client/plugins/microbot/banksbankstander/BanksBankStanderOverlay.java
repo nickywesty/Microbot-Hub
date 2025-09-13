@@ -2,9 +2,6 @@ package net.runelite.client.plugins.microbot.banksbankstander;
 
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderConfig;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderPlugin;
-import net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -29,7 +26,7 @@ public class BanksBankStanderOverlay extends OverlayPanel {
         try {
             panelComponent.setPreferredSize(new Dimension(400, 300));
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Bank's BankStander V" + net.runelite.client.plugins.microbot.bankjs.BanksBankStander.BanksBankStanderScript.version)
+                    .text("Bank's BankStander V" + BanksBankStanderPlugin.version)
                     .color(Color.GREEN)
                     .build());
             ///* Added by Storm
