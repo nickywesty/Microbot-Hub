@@ -69,7 +69,7 @@ public class AutoWoodcuttingOverlay extends OverlayPanel {
 
             // Title
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Micro Woodcutting v" + AutoWoodcuttingScript.version)
+                    .text("Micro Woodcutting v" + AutoWoodcuttingPlugin.version)
                     .color(TITLE_COLOR)
                     .build());
 

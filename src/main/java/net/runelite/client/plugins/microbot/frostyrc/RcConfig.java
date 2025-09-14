@@ -1,7 +1,7 @@
 package net.runelite.client.plugins.microbot.frostyrc;
 
 import net.runelite.client.config.*;
-import enums.RuneType;
+import net.runelite.client.plugins.microbot.frostyrc.enums.RuneType;
 
 
 @ConfigGroup("Frosty")
