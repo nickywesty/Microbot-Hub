@@ -22,9 +22,9 @@ import static net.runelite.client.plugins.microbot.blastoisefurnace.BlastoiseFur
 
 
 @PluginDescriptor(
-        name = "<html>[<font color=#00ffff>§</font>] " + "BlastoiseFurnace",
+        name = "BlastoiseFurnace",
         description = "Storm's BlastoiseFurnace plugin",
-        tags = {"testing", "microbot", "smithing", "bar", "ore", "blast", "furnace"},
+        tags = {"microbot", "smithing", "bar", "ore", "blast", "furnace"},
         authors = {"Storm"},
         version = BlastoiseFurnacePlugin.version,
         minClientVersion = "2.0.7",
