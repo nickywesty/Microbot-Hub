@@ -13,6 +13,7 @@ import net.runelite.client.plugins.microbot.woodcutting.AutoWoodcuttingPlugin;
 import net.runelite.client.plugins.microbot.woodcutting.enums.ForestryEvents;
 import org.slf4j.event.Level;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,7 +34,8 @@ public class RitualEvent implements BlockingEvent {
         try{
             if (plugin == null || !Microbot.isPluginEnabled(plugin)) return false;
             if (Microbot.getClient() == null || !Microbot.isLoggedIn()) return false;
-            Optional<Rs2NpcModel> dryadCache = Rs2NpcCache.getClosestNpcByGameId(NpcID.GATHERING_EVENT_ENCHANTED_RITUAL_DRYAD);
+            Optional<Rs2NpcModel> dryadCache = Rs2NpcCache.getNpcsById(NpcID.GATHERING_EVENT_ENCHANTED_RITUAL_DRYAD)
+                    .min(Comparator.comparingInt(Rs2NpcModel::getDistanceFromPlayer));;
             //var dryad = Rs2Npc.getNpc(NpcID.GATHERING_EVENT_ENCHANTED_RITUAL_DRYAD);
             return dryadCache.isPresent();
         } catch (Exception e) {
