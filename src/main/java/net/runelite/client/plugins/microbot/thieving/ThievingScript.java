@@ -148,7 +148,7 @@ public class ThievingScript extends Script {
             comparator = Comparator.comparingInt(Rs2NpcModel::getDistanceFromPlayer);
         }
 
-        final Optional<Rs2NpcModel> npcOptional = Rs2NpcCache.getAllNpcs()
+        final Optional<Rs2NpcModel> npcOptional = Rs2Npc.getNpcs()
                 .filter(getThievingNpcFilter())
                 .filter(n -> !isNpcNull(n))
                 .min(comparator);
@@ -295,7 +295,7 @@ public class ThievingScript extends Script {
 
     protected boolean shouldRun() {
         if (!Microbot.isLoggedIn()) return false;
-        return super.run();
+        return true;
     }
 
     private boolean sleepUntilWithInterrupt(BooleanSupplier awaitedCondition, BooleanSupplier interruptCondition, int time) {
