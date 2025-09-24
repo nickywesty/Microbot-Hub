@@ -1,6 +1,5 @@
-package net.runelite.client.plugins.microbot.construction;
+package net.runelite.client.plugins.microbot.lunarplankmake;
 
-import net.runelite.client.plugins.microbot.GeoffPlugins.construction2.Construction2Plugin;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -9,28 +8,26 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 import javax.inject.Inject;
 import java.awt.*;
 
-public class ConstructionOverlay extends OverlayPanel {
-
-    private final net.runelite.client.plugins.microbot.GeoffPlugins.construction2.Construction2Plugin plugin;
+public class LunarPlankMakeOverlay extends OverlayPanel {
 
     @Inject
-    public ConstructionOverlay(Construction2Plugin plugin) {
-        this.plugin = plugin;
-        setPosition(OverlayPosition.TOP_LEFT);
+    LunarPlankMakeOverlay(LunarPlankMakePlugin plugin) {
+        super(plugin);
+        setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
+        setNaughty();
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        panelComponent.getChildren().clear();
-
+        panelComponent.setPreferredSize(new Dimension(200, 300));
         panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Construction Script")
+                .text("Plank Make " + LunarPlankMakePlugin.version)
                 .color(Color.YELLOW)
                 .build());
 
+        // Update to display the combined message
         panelComponent.getChildren().add(LineComponent.builder()
-                .left("State:")
-                .right(plugin.getState().toString())
+                .left(LunarPlankMakeScript.combinedMessage)
                 .build());
 
         return super.render(graphics);
