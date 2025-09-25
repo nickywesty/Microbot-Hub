@@ -1,6 +1,5 @@
 package net.runelite.client.plugins.microbot.lunarplankmake;
 
-import LunarPlankMakeConfig;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;

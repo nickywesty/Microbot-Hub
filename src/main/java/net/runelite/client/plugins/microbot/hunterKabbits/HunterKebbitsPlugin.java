@@ -9,7 +9,6 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.lunarplankmake.LunarPlankMakePlugin;
 import net.runelite.client.plugins.microbot.util.misc.TimeUtils;
 import net.runelite.client.ui.overlay.OverlayManager;
 

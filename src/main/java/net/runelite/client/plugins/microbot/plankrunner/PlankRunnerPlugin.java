@@ -24,7 +24,7 @@ import java.time.Instant;
         name = PluginDescriptor.GMason + "Plank Runner",
         description = "Microbot plank runner plugin",
         tags = {"money making", "microbot"},
-        version = AutoLooterPlugin.version,
+        version = PlankRunnerPlugin.version,
         minClientVersion = "2.0.13",
         cardUrl = "",
         iconUrl = "",
@@ -50,8 +50,6 @@ public class PlankRunnerPlugin extends Plugin {
 
     @Inject
     private PlankRunnerScript plankRunnerScript;
-
-    public static String version = "1.1.0";
 
     @Getter
     private Plank plank;

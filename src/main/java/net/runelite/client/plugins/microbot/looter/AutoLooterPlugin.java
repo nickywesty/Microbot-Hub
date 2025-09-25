@@ -8,7 +8,6 @@ import net.runelite.client.plugins.microbot.PluginConstants;
 import net.runelite.client.plugins.microbot.looter.scripts.DefaultScript;
 import net.runelite.client.plugins.microbot.looter.scripts.FlaxScript;
 import net.runelite.client.plugins.microbot.looter.scripts.NatureRuneChestScript;
-import net.runelite.client.plugins.microbot.lunarplankmake.LunarPlankMakePlugin;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
