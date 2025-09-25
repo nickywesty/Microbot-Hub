@@ -9,7 +9,6 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.looter.AutoLooterPlugin;
 import net.runelite.client.plugins.microbot.plankrunner.enums.Plank;
 import net.runelite.client.plugins.microbot.plankrunner.enums.SawmillLocation;
 import net.runelite.client.plugins.microbot.util.grandexchange.Rs2GrandExchange;
