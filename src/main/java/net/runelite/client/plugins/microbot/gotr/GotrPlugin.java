@@ -26,7 +26,7 @@ import net.runelite.client.plugins.microbot.pluginscheduler.condition.logical.Lo
 import net.runelite.client.plugins.microbot.pluginscheduler.event.PluginScheduleEntryPostScheduleTaskEvent;
 import net.runelite.client.plugins.microbot.pluginscheduler.event.PluginScheduleEntryPreScheduleTaskEvent;
 import net.runelite.client.plugins.microbot.pluginscheduler.tasks.AbstractPrePostScheduleTasks;
-import net.runelite.client.plugins.microbot.qualityoflife.scripts.pouch.PouchOverlay;
+import net.runelite.client.plugins.microbot.pouch.PouchOverlay;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.ui.overlay.OverlayManager;
