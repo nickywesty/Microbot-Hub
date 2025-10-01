@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.autoGauntletPrayer;
+package net.runelite.client.plugins.microbot.autogauntletprayer;
 
 import com.google.inject.Provides;
 import net.runelite.api.HeadIcon;
@@ -11,16 +11,13 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.PluginConstants;
-import net.runelite.client.plugins.microbot.autoGauntletPrayer.AutoGauntletConfig;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.npc.Rs2Npc;
 import net.runelite.client.plugins.microbot.util.npc.Rs2NpcModel;
 import net.runelite.client.plugins.microbot.util.prayer.Rs2Prayer;
 import net.runelite.client.plugins.microbot.util.prayer.Rs2PrayerEnum;
-import net.runelite.client.plugins.microbot.util.reflection.Rs2Reflection;
 
 import javax.inject.Inject;
 import java.util.Set;
