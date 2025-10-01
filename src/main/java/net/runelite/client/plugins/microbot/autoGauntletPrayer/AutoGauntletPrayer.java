@@ -40,7 +40,7 @@ import static net.runelite.client.plugins.microbot.Microbot.log;
 )
 
 public class AutoGauntletPrayer extends Plugin {
-    public static final String version = "1.0.7";
+    public static final String version = "1.0.8";
     @Inject
     private AutoGauntletConfig config;
     @Provides
