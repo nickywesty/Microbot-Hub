@@ -8,7 +8,7 @@ import net.runelite.client.config.ConfigItem;
 @ConfigGroup("Auto Gauntlet Prayer")
 @ConfigInformation("LiftedMango <br> 0.1.0 <br><br> Does Gauntlet stuff"
 )
-public interface AutoGauntletConfig extends Config {
+public interface AutoGauntletPrayerConfig extends Config {
     @ConfigItem(
             keyName = "mysticMight?",
             name = "Use lesser prayers?",
