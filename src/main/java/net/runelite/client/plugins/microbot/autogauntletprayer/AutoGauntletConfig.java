@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.autoGauntletPrayer;
+package net.runelite.client.plugins.microbot.autogauntletprayer;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
