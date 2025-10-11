@@ -25,6 +25,7 @@ public class DismissNpcEvent implements BlockingEvent {
     @Override
     public boolean execute() {
         Rs2NpcModel randomEventNPC = Rs2Npc.getRandomEventNPC();
+        if (randomEventNPC == null) return true;
         boolean shouldDismiss = shouldDismissNpc(randomEventNPC);
         if (shouldDismiss) {
             Rs2Npc.interact(randomEventNPC, "Dismiss");
