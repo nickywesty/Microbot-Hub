@@ -435,4 +435,15 @@ public interface SmartMinerConfig extends Config {
     default boolean showSessionStats() {
         return true;
     }
+
+    @ConfigItem(
+            keyName = "randomizeLocation",
+            name = "Randomize Mining Spot",
+            description = "Randomly picks nearby mining locations of same type when banking (adds variety)",
+            position = 0,
+            section = locationSection
+    )
+    default boolean randomizeLocation() {
+        return false;
+    }
 }

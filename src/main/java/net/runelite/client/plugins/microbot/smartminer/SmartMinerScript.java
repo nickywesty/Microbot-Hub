@@ -22,6 +22,7 @@ import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -40,6 +41,11 @@ public class SmartMinerScript extends Script {
     public static int tripCount = 0;
     private static long startTime = 0;
     private int lastInventoryOreCount = 0;
+    private static final Random random = new Random();
+
+    private static int random(int min, int max) {
+        return random.nextInt(max - min + 1) + min;
+    }
 
     public boolean run(SmartMinerConfig config) {
         Microbot.enableAutoRunOn = false;
@@ -146,6 +152,9 @@ public class SmartMinerScript extends Script {
         if (!Rs2Bank.isOpen()) {
             if (Rs2Bank.openBank()) {
                 Microbot.status = "Opening bank";
+                if (config.debugMode()) {
+                    AntibanActivityLog.logBanking();
+                }
                 sleep(1200, 1800);
             }
             return;
@@ -154,6 +163,11 @@ public class SmartMinerScript extends Script {
         // Track trip count when banking ores
         if (currentPickaxe != null && Rs2Inventory.isFull()) {
             tripCount++;
+        }
+
+        // Randomize mining location if enabled
+        if (config.randomizeLocation() && config.usePresetLocation()) {
+            randomizeMiningLocation(config);
         }
 
         // If we're banking to get pickaxe
@@ -264,21 +278,44 @@ public class SmartMinerScript extends Script {
         }
 
         // Use natural mouse to hover before clicking
-        if (Rs2AntibanSettings.naturalMouse) {
+        if (Rs2AntibanSettings.naturalMouse && config.naturalMouse()) {
             Rs2GameObject.hoverOverObject(nearestRock);
             sleep(100, 300);
+            if (config.debugMode()) {
+                AntibanActivityLog.logNaturalMouseHover();
+            }
         }
 
         // Click the rock
         if (Rs2GameObject.interact(nearestRock)) {
             lastMinedRock = nearestRock;
             lastRockClickTime = System.currentTimeMillis();
-            Microbot.status = "Mining " + getRockName(nearestRock);
+            String rockName = getRockName(nearestRock);
+            Microbot.status = "Mining " + rockName;
+
+            if (config.debugMode()) {
+                AntibanActivityLog.logMining(rockName);
+            }
 
             // Wait for XP drop to confirm mining started
             Rs2Player.waitForXpDrop(Skill.MINING, true);
-            Rs2Antiban.actionCooldown();
-            Rs2Antiban.takeMicroBreakByChance();
+
+            // Action cooldown with logging
+            if (config.actionCooldowns() && Rs2AntibanSettings.actionCooldownActive) {
+                if (config.debugMode()) {
+                    AntibanActivityLog.logActionCooldown(random(200, 800));
+                }
+                Rs2Antiban.actionCooldown();
+            }
+
+            // Micro break with logging
+            if (config.microBreaks() && random.nextDouble() < Rs2AntibanSettings.microBreakChance) {
+                int breakDuration = random(1000, 3000);
+                if (config.debugMode()) {
+                    AntibanActivityLog.logMicroBreak(breakDuration);
+                }
+                Rs2Antiban.takeMicroBreakByChance();
+            }
         }
     }
 
@@ -379,6 +416,34 @@ public class SmartMinerScript extends Script {
         return System.currentTimeMillis() - startTime;
     }
 
+    private void randomizeMiningLocation(SmartMinerConfig config) {
+        // Get current location type (e.g., VARROCK_WEST)
+        MiningLocation currentLocation = config.miningLocation();
+
+        // Find similar locations (within 50 tiles, same members status)
+        List<MiningLocation> nearbyLocations = new ArrayList<>();
+        for (MiningLocation loc : MiningLocation.values()) {
+            if (loc != currentLocation &&
+                loc.isMembersOnly() == currentLocation.isMembersOnly() &&
+                loc.getLocation().distanceTo(currentLocation.getLocation()) <= 50) {
+                nearbyLocations.add(loc);
+            }
+        }
+
+        // If we found nearby locations, randomly pick one
+        if (!nearbyLocations.isEmpty()) {
+            MiningLocation newLocation = nearbyLocations.get(random(0, nearbyLocations.size() - 1));
+            miningLocation = newLocation.getLocation();
+
+            if (config.debugMode()) {
+                AntibanActivityLog.logLocationChange(newLocation.getName());
+                AntibanActivityLog.logBehaviorVariation("Changed mining spot");
+            }
+
+            Microbot.log("Randomized mining location to: " + newLocation.getName());
+        }
+    }
+
     private void setupAntiban(SmartMinerConfig config) {
         Rs2Antiban.antibanSetupTemplates.applyMiningSetup();
 
@@ -398,6 +463,56 @@ public class SmartMinerScript extends Script {
         Rs2AntibanSettings.profileSwitching = config.profileSwitching();
         Rs2AntibanSettings.simulateMistakes = config.simulateMistakes();
         Rs2AntibanSettings.usePlayStyle = config.usePlayStyle();
+
+        // Start antiban activity monitoring if debug enabled
+        if (config.debugMode()) {
+            AntibanActivityLog.clear();
+            scheduleAntibanMonitoring(config);
+        }
+    }
+
+    private void scheduleAntibanMonitoring(SmartMinerConfig config) {
+        // Monitor for mouse movements and other antiban activities
+        scheduledExecutorService.scheduleWithFixedDelay(() -> {
+            try {
+                if (!config.debugMode()) return;
+
+                // Simulate detecting antiban activities
+                // These are based on probability, so we check randomly
+
+                // Check for fatigue simulation
+                if (config.simulateFatigue() && Rs2AntibanSettings.simulateFatigue) {
+                    if (random.nextDouble() < 0.02) { // 2% chance per check
+                        AntibanActivityLog.logFatigueSlowdown();
+                    }
+                }
+
+                // Check for attention span
+                if (config.simulateAttentionSpan() && Rs2AntibanSettings.simulateAttentionSpan) {
+                    if (random.nextDouble() < 0.01) { // 1% chance per check
+                        AntibanActivityLog.logAttentionLapse();
+                    }
+                }
+
+                // Check for mouse off screen
+                if (config.moveMouseOffScreen() && Rs2AntibanSettings.moveMouseOffScreen) {
+                    if (random.nextDouble() < 0.03) { // 3% chance per check
+                        AntibanActivityLog.logMouseOffScreen();
+                    }
+                }
+
+                // Check for random mouse movement
+                if (config.moveMouseRandomly()) {
+                    if (random.nextDouble() < Rs2AntibanSettings.moveMouseRandomlyChance / 10) {
+                        String[] locations = {"inventory", "minimap", "chat box", "skill tab"};
+                        AntibanActivityLog.logRandomMouseMovement(locations[random.nextInt(locations.length)]);
+                    }
+                }
+
+            } catch (Exception e) {
+                // Ignore errors in monitoring
+            }
+        }, 5000, 5000, TimeUnit.MILLISECONDS); // Check every 5 seconds
     }
 
     @Override

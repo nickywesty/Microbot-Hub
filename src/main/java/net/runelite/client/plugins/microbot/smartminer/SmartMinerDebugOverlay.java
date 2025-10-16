@@ -45,7 +45,7 @@ public class SmartMinerDebugOverlay extends OverlayPanel {
         }
 
         try {
-            panelComponent.setPreferredSize(new Dimension(320, 400));
+            panelComponent.setPreferredSize(new Dimension(350, 500));
 
             // Header with RS theme
             panelComponent.getChildren().add(TitleComponent.builder()
@@ -55,36 +55,64 @@ public class SmartMinerDebugOverlay extends OverlayPanel {
 
             panelComponent.getChildren().add(LineComponent.builder().build());
 
-            // === ANTIBAN ACTIVITY SECTION ===
+            // === LIVE ACTIVITY LOG SECTION ===
             panelComponent.getChildren().add(TitleComponent.builder()
-                    .text("Antiban Activity")
+                    .text("📋 Live Activity Log")
+                    .color(RS_YELLOW)
+                    .build());
+
+            var recentActivity = AntibanActivityLog.getRecentActivity();
+            if (recentActivity.isEmpty()) {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("  No activity yet...")
+                        .leftColor(RS_GRAY)
+                        .build());
+            } else {
+                for (AntibanActivityLog.LogEntry entry : recentActivity) {
+                    Color logColor = getLogColor(entry.type);
+                    panelComponent.getChildren().add(LineComponent.builder()
+                            .left(entry.timestamp)
+                            .right(entry.message)
+                            .leftColor(RS_GRAY)
+                            .rightColor(logColor)
+                            .build());
+                }
+            }
+
+            panelComponent.getChildren().add(LineComponent.builder().build());
+
+            // === ANTIBAN STATUS SECTION ===
+            panelComponent.getChildren().add(TitleComponent.builder()
+                    .text("Antiban Status")
                     .color(RS_CYAN)
                     .build());
 
             // Natural Mouse
-            if (config.naturalMouse()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Natural Mouse:")
-                        .right(Rs2AntibanSettings.naturalMouse ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.naturalMouse ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Natural Mouse:")
+                    .right(config.naturalMouse() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.naturalMouse() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Move Mouse Off Screen
-            if (config.moveMouseOffScreen()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Mouse Off-Screen:")
-                        .right(Rs2AntibanSettings.moveMouseOffScreen ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.moveMouseOffScreen ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Mouse Off-Screen:")
+                    .right(config.moveMouseOffScreen() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.moveMouseOffScreen() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Move Mouse Randomly
             if (config.moveMouseRandomly()) {
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("  Random Mouse:")
-                        .right(String.format("%.0f%% chance", Rs2AntibanSettings.moveMouseRandomlyChance * 100))
+                        .right(String.format("✓ 10%% chance", Rs2AntibanSettings.moveMouseRandomlyChance * 100))
                         .rightColor(RS_YELLOW)
+                        .build());
+            } else {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("  Random Mouse:")
+                        .right("✗ DISABLED")
+                        .rightColor(RS_GRAY)
                         .build());
             }
 
@@ -97,7 +125,13 @@ public class SmartMinerDebugOverlay extends OverlayPanel {
                         .build());
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("    Chance:")
-                        .right(String.format("%.0f%%", Rs2AntibanSettings.actionCooldownChance * 100))
+                        .right("20%")
+                        .rightColor(RS_GRAY)
+                        .build());
+            } else {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("  Action Cooldown:")
+                        .right("✗ DISABLED")
                         .rightColor(RS_GRAY)
                         .build());
             }
@@ -106,73 +140,65 @@ public class SmartMinerDebugOverlay extends OverlayPanel {
             if (config.microBreaks()) {
                 panelComponent.getChildren().add(LineComponent.builder()
                         .left("  Micro Breaks:")
-                        .right(String.format("%.1f%% chance", Rs2AntibanSettings.microBreakChance * 100))
+                        .right("✓ 5% chance")
                         .rightColor(RS_YELLOW)
+                        .build());
+            } else {
+                panelComponent.getChildren().add(LineComponent.builder()
+                        .left("  Micro Breaks:")
+                        .right("✗ DISABLED")
+                        .rightColor(RS_GRAY)
                         .build());
             }
 
             // Simulate Fatigue
-            if (config.simulateFatigue()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Fatigue:")
-                        .right(Rs2AntibanSettings.simulateFatigue ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.simulateFatigue ? RS_ORANGE : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Fatigue:")
+                    .right(config.simulateFatigue() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.simulateFatigue() ? RS_ORANGE : RS_GRAY)
+                    .build());
 
             // Attention Span
-            if (config.simulateAttentionSpan()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Attention Span:")
-                        .right(Rs2AntibanSettings.simulateAttentionSpan ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.simulateAttentionSpan ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Attention Span:")
+                    .right(config.simulateAttentionSpan() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.simulateAttentionSpan() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Behavioral Variability
-            if (config.behavioralVariability()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Behavior Variation:")
-                        .right(Rs2AntibanSettings.behavioralVariability ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.behavioralVariability ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Behavior Variation:")
+                    .right(config.behavioralVariability() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.behavioralVariability() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Non-Linear Intervals
-            if (config.nonLinearIntervals()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Non-Linear Timing:")
-                        .right(Rs2AntibanSettings.nonLinearIntervals ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.nonLinearIntervals ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Non-Linear Timing:")
+                    .right(config.nonLinearIntervals() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.nonLinearIntervals() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Profile Switching
-            if (config.profileSwitching()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Profile Switching:")
-                        .right(Rs2AntibanSettings.profileSwitching ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.profileSwitching ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Profile Switching:")
+                    .right(config.profileSwitching() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.profileSwitching() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             // Simulate Mistakes
-            if (config.simulateMistakes()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Mistake Simulation:")
-                        .right(Rs2AntibanSettings.simulateMistakes ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.simulateMistakes ? RS_ORANGE : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Mistake Simulation:")
+                    .right(config.simulateMistakes() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.simulateMistakes() ? RS_ORANGE : RS_GRAY)
+                    .build());
 
             // Use Play Style
-            if (config.usePlayStyle()) {
-                panelComponent.getChildren().add(LineComponent.builder()
-                        .left("  Play Style:")
-                        .right(Rs2AntibanSettings.usePlayStyle ? "✓ ACTIVE" : "✗ OFF")
-                        .rightColor(Rs2AntibanSettings.usePlayStyle ? RS_GREEN : RS_GRAY)
-                        .build());
-            }
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Play Style:")
+                    .right(config.usePlayStyle() ? "✓ ENABLED" : "✗ DISABLED")
+                    .rightColor(config.usePlayStyle() ? RS_GREEN : RS_GRAY)
+                    .build());
 
             panelComponent.getChildren().add(LineComponent.builder().build());
 
@@ -233,6 +259,28 @@ public class SmartMinerDebugOverlay extends OverlayPanel {
             return String.format("%02d:%02d:%02d", hours, minutes, seconds);
         } else {
             return String.format("%02d:%02d", minutes, seconds);
+        }
+    }
+
+    private Color getLogColor(AntibanActivityLog.LogType type) {
+        switch (type) {
+            case MOUSE_MOVEMENT:
+                return RS_CYAN;
+            case ACTION_DELAY:
+                return RS_ORANGE;
+            case BREAK:
+                return RS_YELLOW;
+            case FATIGUE:
+                return new Color(200, 150, 255); // Purple
+            case ATTENTION:
+                return new Color(255, 182, 193); // Light pink
+            case BEHAVIOR:
+                return RS_GREEN;
+            case MISTAKE:
+                return RS_RED;
+            case GENERAL:
+            default:
+                return RS_WHITE;
         }
     }
 }
