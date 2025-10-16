@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/c/Users/Elite/Desktop/Coding/Microbot/**)",
+      "Read(//mnt/c/Users/Elite/Desktop/Microbot Practice/**)",
+      "Read(//mnt/c/Users/Elite/Desktop/Coding/**)",
+      "Read(//mnt/c/Users/Elite/Desktop/**)",
+      "Bash(mkdir:*)",
+      "Bash(./gradlew build:*)",
+      "Bash(gradle build:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
