@@ -42,6 +42,9 @@ public class SmartMinerPlugin extends Plugin {
     @Inject
     private SmartMinerOverlay overlay;
 
+    @Inject
+    private SmartMinerDebugOverlay debugOverlay;
+
     @Provides
     SmartMinerConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(SmartMinerConfig.class);
@@ -54,6 +57,7 @@ public class SmartMinerPlugin extends Plugin {
         log.info("Smart Miner plugin started");
         if (overlayManager != null) {
             overlayManager.add(overlay);
+            overlayManager.add(debugOverlay);
         }
         script = new SmartMinerScript();
         script.run(config);
@@ -64,6 +68,7 @@ public class SmartMinerPlugin extends Plugin {
         log.info("Smart Miner plugin stopped");
         if (overlayManager != null) {
             overlayManager.remove(overlay);
+            overlayManager.remove(debugOverlay);
         }
         if (script != null) {
             script.shutdown();

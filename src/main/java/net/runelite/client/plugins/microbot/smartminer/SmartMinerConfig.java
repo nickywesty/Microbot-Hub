@@ -45,6 +45,20 @@ public interface SmartMinerConfig extends Config {
     )
     String bankingSection = "banking";
 
+    @ConfigSection(
+            name = "Antiban Settings",
+            description = "Configure human-like behavior to avoid detection",
+            position = 4
+    )
+    String antibanSection = "antiban";
+
+    @ConfigSection(
+            name = "Debug & Display",
+            description = "Advanced debugging and display options",
+            position = 5
+    )
+    String debugSection = "debug";
+
     // ===== GENERAL SETTINGS =====
 
     @ConfigItem(
@@ -251,5 +265,174 @@ public interface SmartMinerConfig extends Config {
     )
     default String itemsToKeep() {
         return "pickaxe";
+    }
+
+    // ===== ANTIBAN SETTINGS =====
+
+    @ConfigItem(
+            keyName = "naturalMouse",
+            name = "Natural Mouse",
+            description = "Simulates human-like mouse movements with curves and variations",
+            position = 0,
+            section = antibanSection
+    )
+    default boolean naturalMouse() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "moveMouseOffScreen",
+            name = "Move Mouse Off Screen",
+            description = "Occasionally moves mouse off-screen like a real player",
+            position = 1,
+            section = antibanSection
+    )
+    default boolean moveMouseOffScreen() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "moveMouseRandomly",
+            name = "Move Mouse Randomly",
+            description = "Randomly moves mouse to different areas of the screen",
+            position = 2,
+            section = antibanSection
+    )
+    default boolean moveMouseRandomly() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "actionCooldowns",
+            name = "Action Cooldowns",
+            description = "Adds random delays between actions to simulate thinking time",
+            position = 3,
+            section = antibanSection
+    )
+    default boolean actionCooldowns() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "microBreaks",
+            name = "Micro Breaks",
+            description = "Takes random micro-breaks during activity (1-3 seconds)",
+            position = 4,
+            section = antibanSection
+    )
+    default boolean microBreaks() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "simulateFatigue",
+            name = "Simulate Fatigue",
+            description = "Gradually slows down actions over time like a human getting tired",
+            position = 5,
+            section = antibanSection
+    )
+    default boolean simulateFatigue() {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "simulateAttentionSpan",
+            name = "Simulate Attention Span",
+            description = "Varies focus and reaction times based on playtime duration",
+            position = 6,
+            section = antibanSection
+    )
+    default boolean simulateAttentionSpan() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "behavioralVariability",
+            name = "Behavioral Variability",
+            description = "Introduces random variations in behavior patterns",
+            position = 7,
+            section = antibanSection
+    )
+    default boolean behavioralVariability() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "nonLinearIntervals",
+            name = "Non-Linear Intervals",
+            description = "Uses non-predictable timing intervals between actions",
+            position = 8,
+            section = antibanSection
+    )
+    default boolean nonLinearIntervals() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "profileSwitching",
+            name = "Profile Switching",
+            description = "Periodically switches behavior profiles for more realistic patterns",
+            position = 9,
+            section = antibanSection
+    )
+    default boolean profileSwitching() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "simulateMistakes",
+            name = "Simulate Mistakes",
+            description = "Occasionally makes human-like mistakes (misclicks, wrong targets)",
+            position = 10,
+            section = antibanSection
+    )
+    default boolean simulateMistakes() {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "usePlayStyle",
+            name = "Use Play Style",
+            description = "Adapts behavior based on configured play style preferences",
+            position = 11,
+            section = antibanSection
+    )
+    default boolean usePlayStyle() {
+        return true;
+    }
+
+    // ===== DEBUG & DISPLAY SETTINGS =====
+
+    @ConfigItem(
+            keyName = "debugMode",
+            name = "Debug Mode",
+            description = "Shows detailed debug overlay with antiban activity tracking",
+            position = 0,
+            section = debugSection
+    )
+    default boolean debugMode() {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "showXpTracker",
+            name = "Show XP Tracker",
+            description = "Displays XP/hour and progress to next level",
+            position = 1,
+            section = debugSection
+    )
+    default boolean showXpTracker() {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "showSessionStats",
+            name = "Show Session Stats",
+            description = "Displays runtime, ores mined, trips completed",
+            position = 2,
+            section = debugSection
+    )
+    default boolean showSessionStats() {
+        return true;
     }
 }

@@ -35,10 +35,22 @@ public class SmartMinerScript extends Script {
     private long lastRockClickTime = 0;
     private static final long ROCK_RESPAWN_CHECK_DELAY = 3000; // 3 seconds minimum between clicks on same rock
 
+    // Session statistics
+    public static long oresMined = 0;
+    public static int tripCount = 0;
+    private static long startTime = 0;
+    private int lastInventoryOreCount = 0;
+
     public boolean run(SmartMinerConfig config) {
         Microbot.enableAutoRunOn = false;
         Rs2Antiban.resetAntibanSettings();
-        setupAntiban();
+        setupAntiban(config);
+
+        // Initialize session stats
+        startTime = System.currentTimeMillis();
+        oresMined = 0;
+        tripCount = 0;
+        lastInventoryOreCount = 0;
 
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
@@ -139,6 +151,11 @@ public class SmartMinerScript extends Script {
             return;
         }
 
+        // Track trip count when banking ores
+        if (currentPickaxe != null && Rs2Inventory.isFull()) {
+            tripCount++;
+        }
+
         // If we're banking to get pickaxe
         if (currentPickaxe == null) {
             // Find best pickaxe in bank
@@ -197,6 +214,9 @@ public class SmartMinerScript extends Script {
     }
 
     private void handleMining(SmartMinerConfig config) {
+        // Track ores mined
+        updateOreCount(config);
+
         // Check if player is already mining
         if (Rs2Player.isAnimating()) {
             Microbot.status = "Mining...";
@@ -267,18 +287,9 @@ public class SmartMinerScript extends Script {
                 .map(String::trim)
                 .toArray(String[]::new);
 
-        // Get list of ores to drop
-        List<String> oresToDrop = getSelectedOreTypes(config).stream()
-                .map(OreType::getOreName)
-                .collect(Collectors.toList());
-
-        // Drop ores
-        for (String ore : oresToDrop) {
-            if (Rs2Inventory.contains(ore)) {
-                Rs2Inventory.drop(ore);
-                sleep(50, 150);
-            }
-        }
+        // Drop all ores except items to keep
+        Rs2Inventory.dropAllExcept(itemsToKeep);
+        sleep(600, 1200);
 
         currentState = MiningState.MINING;
     }
@@ -346,14 +357,47 @@ public class SmartMinerScript extends Script {
         return comp != null ? comp.getName() : "";
     }
 
-    private void setupAntiban() {
+    private void updateOreCount(SmartMinerConfig config) {
+        List<OreType> selectedOres = getSelectedOreTypes(config);
+        int currentOreCount = 0;
+
+        // Count all selected ore types in inventory
+        for (OreType ore : selectedOres) {
+            currentOreCount += Rs2Inventory.count(ore.getOreName());
+        }
+
+        // If ore count increased, update total
+        if (currentOreCount > lastInventoryOreCount) {
+            oresMined += (currentOreCount - lastInventoryOreCount);
+        }
+
+        lastInventoryOreCount = currentOreCount;
+    }
+
+    public static long getRuntime() {
+        if (startTime == 0) return 0;
+        return System.currentTimeMillis() - startTime;
+    }
+
+    private void setupAntiban(SmartMinerConfig config) {
         Rs2Antiban.antibanSetupTemplates.applyMiningSetup();
-        Rs2AntibanSettings.actionCooldownChance = 0.2;
-        Rs2AntibanSettings.microBreakChance = 0.05;
-        Rs2AntibanSettings.naturalMouse = true;
-        Rs2AntibanSettings.moveMouseOffScreen = true;
-        Rs2AntibanSettings.moveMouseRandomly = true;
-        Rs2AntibanSettings.moveMouseRandomlyChance = 0.1;
+
+        // Apply user-configured antiban settings
+        Rs2AntibanSettings.naturalMouse = config.naturalMouse();
+        Rs2AntibanSettings.moveMouseOffScreen = config.moveMouseOffScreen();
+        Rs2AntibanSettings.moveMouseRandomly = config.moveMouseRandomly();
+        Rs2AntibanSettings.moveMouseRandomlyChance = config.moveMouseRandomly() ? 0.1 : 0.0;
+
+        Rs2AntibanSettings.actionCooldownChance = config.actionCooldowns() ? 0.2 : 0.0;
+        Rs2AntibanSettings.microBreakChance = config.microBreaks() ? 0.05 : 0.0;
+
+        Rs2AntibanSettings.simulateFatigue = config.simulateFatigue();
+        Rs2AntibanSettings.simulateAttentionSpan = config.simulateAttentionSpan();
+        Rs2AntibanSettings.behavioralVariability = config.behavioralVariability();
+        Rs2AntibanSettings.nonLinearIntervals = config.nonLinearIntervals();
+        Rs2AntibanSettings.profileSwitching = config.profileSwitching();
+        Rs2AntibanSettings.simulateMistakes = config.simulateMistakes();
+        Rs2AntibanSettings.usePlayStyle = config.usePlayStyle();
     }
 
     @Override
