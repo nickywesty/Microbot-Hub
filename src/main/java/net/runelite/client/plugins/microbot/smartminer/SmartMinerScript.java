@@ -207,12 +207,20 @@ public class SmartMinerScript extends Script {
     }
 
     private void handleWalkingToMine(SmartMinerConfig config) {
-        if (Rs2Player.isMoving()) return;
+        if (Rs2Player.isMoving()) {
+            Microbot.status = "Walking to mine...";
+            return;
+        }
 
         if (miningLocation == null) {
             miningLocation = config.usePresetLocation()
                     ? config.miningLocation().getLocation()
                     : startingLocation;
+
+            if (config.debugMode()) {
+                AntibanActivityLog.logLocationChange(config.usePresetLocation() ?
+                    config.miningLocation().getName() : "Current location");
+            }
         }
 
         int distanceToMine = Rs2Player.getWorldLocation().distanceTo(miningLocation);
@@ -223,8 +231,15 @@ public class SmartMinerScript extends Script {
             return;
         }
 
-        Rs2Walker.walkTo(miningLocation, Math.min(config.miningRadius(), 5));
-        Rs2Antiban.actionCooldown();
+        Microbot.status = "Walking to " + (config.usePresetLocation() ?
+            config.miningLocation().getName() : "mine");
+
+        boolean walked = Rs2Walker.walkTo(miningLocation, 2);
+        if (walked && config.debugMode()) {
+            AntibanActivityLog.log("🚶 Walking to mining location", AntibanActivityLog.LogType.GENERAL);
+        }
+
+        sleep(600, 1200); // Wait between walk attempts
     }
 
     private void handleMining(SmartMinerConfig config) {
@@ -300,21 +315,32 @@ public class SmartMinerScript extends Script {
             // Wait for XP drop to confirm mining started
             Rs2Player.waitForXpDrop(Skill.MINING, true);
 
-            // Action cooldown with logging
-            if (config.actionCooldowns() && Rs2AntibanSettings.actionCooldownActive) {
-                if (config.debugMode()) {
-                    AntibanActivityLog.logActionCooldown(random(200, 800));
+            // Action cooldown with logging - trigger more frequently
+            if (config.actionCooldowns()) {
+                if (random.nextDouble() < 0.30) { // 30% chance after each action
+                    int cooldownTime = random(150, 950);
+                    if (config.debugMode()) {
+                        AntibanActivityLog.logActionCooldown(cooldownTime);
+                    }
+                    sleep(cooldownTime);
                 }
-                Rs2Antiban.actionCooldown();
             }
 
-            // Micro break with logging
-            if (config.microBreaks() && random.nextDouble() < Rs2AntibanSettings.microBreakChance) {
-                int breakDuration = random(1000, 3000);
-                if (config.debugMode()) {
-                    AntibanActivityLog.logMicroBreak(breakDuration);
+            // Micro break with logging - more frequent breaks
+            if (config.microBreaks()) {
+                if (random.nextDouble() < 0.10) { // 10% chance after each action
+                    int breakDuration = random(800, 4000);
+                    if (config.debugMode()) {
+                        AntibanActivityLog.logMicroBreak(breakDuration);
+                    }
+                    sleep(breakDuration);
                 }
-                Rs2Antiban.takeMicroBreakByChance();
+            }
+
+            // Random delays to be unpredictable
+            if (config.nonLinearIntervals()) {
+                int randomDelay = random(50, 350);
+                sleep(randomDelay);
             }
         }
     }
@@ -417,22 +443,30 @@ public class SmartMinerScript extends Script {
     }
 
     private void randomizeMiningLocation(SmartMinerConfig config) {
+        // Only randomize 30% of the time to not be too predictable
+        if (random.nextDouble() > 0.30) {
+            return;
+        }
+
         // Get current location type (e.g., VARROCK_WEST)
         MiningLocation currentLocation = config.miningLocation();
 
-        // Find similar locations (within 50 tiles, same members status)
+        // Find similar locations (within 100 tiles for more options, same members status)
         List<MiningLocation> nearbyLocations = new ArrayList<>();
         for (MiningLocation loc : MiningLocation.values()) {
             if (loc != currentLocation &&
-                loc.isMembersOnly() == currentLocation.isMembersOnly() &&
-                loc.getLocation().distanceTo(currentLocation.getLocation()) <= 50) {
-                nearbyLocations.add(loc);
+                loc.isMembersOnly() == currentLocation.isMembersOnly()) {
+                // Calculate distance - allow further locations for more variety
+                int distance = loc.getLocation().distanceTo(currentLocation.getLocation());
+                if (distance > 0 && distance <= 150) { // Increased range
+                    nearbyLocations.add(loc);
+                }
             }
         }
 
         // If we found nearby locations, randomly pick one
         if (!nearbyLocations.isEmpty()) {
-            MiningLocation newLocation = nearbyLocations.get(random(0, nearbyLocations.size() - 1));
+            MiningLocation newLocation = nearbyLocations.get(random.nextInt(nearbyLocations.size()));
             miningLocation = newLocation.getLocation();
 
             if (config.debugMode()) {
@@ -440,7 +474,13 @@ public class SmartMinerScript extends Script {
                 AntibanActivityLog.logBehaviorVariation("Changed mining spot");
             }
 
-            Microbot.log("Randomized mining location to: " + newLocation.getName());
+            Microbot.log("Randomized mining location to: " + newLocation.getName() +
+                " (distance: " + newLocation.getLocation().distanceTo(currentLocation.getLocation()) + " tiles)");
+        } else {
+            // No nearby locations found, log it
+            if (config.debugMode()) {
+                Microbot.log("No nearby alternative mining locations found for " + currentLocation.getName());
+            }
         }
     }
 
@@ -476,43 +516,77 @@ public class SmartMinerScript extends Script {
         scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
                 if (!config.debugMode()) return;
+                if (currentState != MiningState.MINING && currentState != MiningState.WALKING_TO_MINE) return;
 
-                // Simulate detecting antiban activities
-                // These are based on probability, so we check randomly
+                // MUCH more active antiban logging with higher probabilities
 
-                // Check for fatigue simulation
+                // Fatigue simulation - kicks in more often
                 if (config.simulateFatigue() && Rs2AntibanSettings.simulateFatigue) {
-                    if (random.nextDouble() < 0.02) { // 2% chance per check
+                    if (random.nextDouble() < 0.15) { // 15% chance per check
                         AntibanActivityLog.logFatigueSlowdown();
                     }
                 }
 
-                // Check for attention span
+                // Attention span - more realistic human distraction
                 if (config.simulateAttentionSpan() && Rs2AntibanSettings.simulateAttentionSpan) {
-                    if (random.nextDouble() < 0.01) { // 1% chance per check
+                    if (random.nextDouble() < 0.12) { // 12% chance per check
                         AntibanActivityLog.logAttentionLapse();
                     }
                 }
 
-                // Check for mouse off screen
+                // Mouse off screen - humans look away frequently
                 if (config.moveMouseOffScreen() && Rs2AntibanSettings.moveMouseOffScreen) {
-                    if (random.nextDouble() < 0.03) { // 3% chance per check
+                    if (random.nextDouble() < 0.20) { // 20% chance per check
                         AntibanActivityLog.logMouseOffScreen();
                     }
                 }
 
-                // Check for random mouse movement
+                // Random mouse movement - very common for real players
                 if (config.moveMouseRandomly()) {
-                    if (random.nextDouble() < Rs2AntibanSettings.moveMouseRandomlyChance / 10) {
-                        String[] locations = {"inventory", "minimap", "chat box", "skill tab"};
+                    if (random.nextDouble() < 0.25) { // 25% chance per check
+                        String[] locations = {
+                            "inventory", "minimap", "chat box", "skill tab",
+                            "combat tab", "prayer tab", "spell book", "friends list",
+                            "clan chat", "equipment", "world map", "music player"
+                        };
                         AntibanActivityLog.logRandomMouseMovement(locations[random.nextInt(locations.length)]);
+                    }
+                }
+
+                // Behavioral variability - random actions
+                if (config.behavioralVariability() && Rs2AntibanSettings.behavioralVariability) {
+                    if (random.nextDouble() < 0.10) { // 10% chance
+                        String[] behaviors = {
+                            "Checking XP", "Looking at stats", "Hovering over items",
+                            "Moving camera", "Checking minimap", "Reading chat"
+                        };
+                        AntibanActivityLog.logBehaviorVariation(behaviors[random.nextInt(behaviors.length)]);
+                    }
+                }
+
+                // Profile switching
+                if (config.profileSwitching() && Rs2AntibanSettings.profileSwitching) {
+                    if (random.nextDouble() < 0.08) { // 8% chance
+                        String[] profiles = {"Efficient", "Relaxed", "Focused", "Distracted", "Tired"};
+                        AntibanActivityLog.logProfileSwitch(profiles[random.nextInt(profiles.length)]);
+                    }
+                }
+
+                // Simulate mistakes - rare but happens
+                if (config.simulateMistakes() && Rs2AntibanSettings.simulateMistakes) {
+                    if (random.nextDouble() < 0.05) { // 5% chance
+                        String[] mistakes = {
+                            "Misclick detected", "Hovered wrong rock",
+                            "Clicked too fast", "Moved mouse erratically"
+                        };
+                        AntibanActivityLog.logMistake(mistakes[random.nextInt(mistakes.length)]);
                     }
                 }
 
             } catch (Exception e) {
                 // Ignore errors in monitoring
             }
-        }, 5000, 5000, TimeUnit.MILLISECONDS); // Check every 5 seconds
+        }, 3000, 3000, TimeUnit.MILLISECONDS); // Check every 3 seconds (more frequent)
     }
 
     @Override
