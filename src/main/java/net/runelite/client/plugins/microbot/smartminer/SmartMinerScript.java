@@ -18,6 +18,7 @@ import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
+import net.runelite.client.plugins.microbot.util.security.Login;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
@@ -70,6 +71,7 @@ public class SmartMinerScript extends Script {
         walkerTargetSet = false;
         effectiveMiningRadius = 0;
         lastLocationCheck = 0;
+        lastPlayerCheck = 0;
 
         // Initialize session stats
         startTime = System.currentTimeMillis();
@@ -100,6 +102,13 @@ public class SmartMinerScript extends Script {
                         Microbot.log("⚠️ Player displaced from mining area! Returning...");
                         handleDisplacement(config);
                         return;
+                    }
+                }
+
+                // Check for players in our cluster (every 5 seconds)
+                if (shouldCheckForPlayers() && config.hopOnPlayersNearby() > 0) {
+                    if (checkPlayersInCluster(config)) {
+                        return; // World hop initiated, skip rest of loop
                     }
                 }
 
@@ -646,6 +655,92 @@ public class SmartMinerScript extends Script {
 
         // Go back to finding optimal spot state (which will walk there first if needed)
         currentState = MiningState.WALKING_TO_MINE;
+    }
+
+    // Player detection and world hopping methods
+    private boolean shouldCheckForPlayers() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastPlayerCheck >= PLAYER_CHECK_INTERVAL) {
+            lastPlayerCheck = currentTime;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean checkPlayersInCluster(SmartMinerConfig config) {
+        // Only check when we're actively mining at our cluster
+        if (currentState != MiningState.MINING &&
+            currentState != MiningState.WAITING_FOR_RESPAWN) {
+            return false;
+        }
+
+        // Need to have found our optimal spot first (effectiveMiningRadius set)
+        if (effectiveMiningRadius == 0 || miningLocation == null) {
+            return false;
+        }
+
+        WorldPoint clusterCenter = miningLocation;
+        int clusterRadius = effectiveMiningRadius; // Usually 4 tiles
+
+        // Count players in our cluster (excluding ourselves)
+        long playersInCluster = Microbot.getClient().getTopLevelWorldView().players().stream()
+            .filter(player -> player != null)
+            .filter(player -> player != Microbot.getClient().getLocalPlayer())
+            .filter(player -> {
+                WorldPoint playerLoc = player.getWorldLocation();
+                return playerLoc != null &&
+                       playerLoc.distanceTo(clusterCenter) <= clusterRadius;
+            })
+            .count();
+
+        if (playersInCluster >= config.hopOnPlayersNearby()) {
+            Microbot.log("👥 " + playersInCluster + " player(s) in cluster - hopping worlds...");
+
+            if (config.debugMode()) {
+                AntibanActivityLog.log("👥 Detected " + playersInCluster + " players in cluster, hopping worlds",
+                    AntibanActivityLog.LogType.GENERAL);
+            }
+
+            hopToRandomWorld(config);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void hopToRandomWorld(SmartMinerConfig config) {
+        try {
+            Microbot.status = "Hopping worlds (players nearby)...";
+
+            // Get a random world (members/f2p based on current account)
+            boolean isMembers = Rs2Player.isMember();
+            int targetWorld = Login.getRandomWorld(isMembers);
+
+            if (config.debugMode()) {
+                AntibanActivityLog.log("🌍 Hopping to world " + targetWorld,
+                    AntibanActivityLog.LogType.GENERAL);
+            }
+
+            // Hop to the world
+            boolean hopped = Microbot.hopToWorld(targetWorld);
+
+            if (hopped) {
+                Microbot.log("✓ Hopped to world " + targetWorld);
+                sleep(2000, 3000); // Wait after hopping for everything to load
+
+                // Reset effective radius to re-scan after hop (players might be in new world too)
+                effectiveMiningRadius = 0;
+                walkerTargetSet = false;
+                currentState = MiningState.FINDING_OPTIMAL_SPOT;
+
+                Microbot.status = "Re-scanning after world hop...";
+            } else {
+                Microbot.log("⚠️ Failed to hop worlds");
+            }
+
+        } catch (Exception e) {
+            Microbot.log("Error hopping worlds: " + e.getMessage());
+        }
     }
 
     // Helper methods
