@@ -52,6 +52,10 @@ public class SmartMinerPlugin extends Plugin {
 
     private SmartMinerScript script;
 
+    public SmartMinerScript getScript() {
+        return script;
+    }
+
     @Override
     protected void startUp() throws AWTException {
         log.info("Smart Miner plugin started");

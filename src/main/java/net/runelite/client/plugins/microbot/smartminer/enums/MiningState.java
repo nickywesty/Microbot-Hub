@@ -5,6 +5,7 @@ public enum MiningState {
     WALKING_TO_BANK,
     BANKING,
     WALKING_TO_MINE,
+    FINDING_OPTIMAL_SPOT,
     MINING,
     DROPPING,
     WAITING_FOR_RESPAWN,

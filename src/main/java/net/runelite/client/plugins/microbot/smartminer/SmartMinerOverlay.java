@@ -323,8 +323,11 @@ public class SmartMinerOverlay extends OverlayPanel {
     private void renderRockHighlights(Graphics2D graphics) {
         if (Microbot.getClient().getLocalPlayer() == null) return;
 
-        // Get rocks within radius
-        var rocks = SmartMinerScript.getMinableRocksInRadius(config);
+        // Get rocks within radius - need script instance for non-static method
+        SmartMinerScript script = plugin.getScript();
+        if (script == null) return;
+
+        var rocks = script.getMinableRocksInRadius(config);
 
         for (GameObject rock : rocks) {
             if (rock == null) continue;

@@ -14,10 +14,13 @@ import net.runelite.client.plugins.microbot.smartminer.enums.Pickaxe;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2Antiban;
 import net.runelite.client.plugins.microbot.util.antiban.Rs2AntibanSettings;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
+import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
+import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
+import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +38,8 @@ public class SmartMinerScript extends Script {
     private GameObject lastMinedRock = null;
     private long lastRockClickTime = 0;
     private static final long ROCK_RESPAWN_CHECK_DELAY = 3000; // 3 seconds minimum between clicks on same rock
+    private boolean walkerTargetSet = false; // Track if we've set the walker target
+    private int effectiveMiningRadius = 0; // Reduced radius once at optimal spot (3-4 tiles for cluster)
 
     // Session statistics
     public static long oresMined = 0;
@@ -88,6 +93,9 @@ public class SmartMinerScript extends Script {
                         break;
                     case WALKING_TO_MINE:
                         handleWalkingToMine(config);
+                        break;
+                    case FINDING_OPTIMAL_SPOT:
+                        handleFindingOptimalSpot(config);
                         break;
                     case MINING:
                         handleMining(config);
@@ -203,15 +211,11 @@ public class SmartMinerScript extends Script {
         }
 
         Rs2Bank.closeBank();
+        walkerTargetSet = false; // Reset flag when starting new walk
         currentState = MiningState.WALKING_TO_MINE;
     }
 
     private void handleWalkingToMine(SmartMinerConfig config) {
-        if (Rs2Player.isMoving()) {
-            Microbot.status = "Walking to mine...";
-            return;
-        }
-
         if (miningLocation == null) {
             miningLocation = config.usePresetLocation()
                     ? config.miningLocation().getLocation()
@@ -226,20 +230,181 @@ public class SmartMinerScript extends Script {
         int distanceToMine = Rs2Player.getWorldLocation().distanceTo(miningLocation);
 
         if (distanceToMine <= config.miningRadius()) {
-            currentState = MiningState.MINING;
-            Microbot.status = "Arrived at mining location";
+            Rs2Walker.setTarget(null); // Clear the path
+            walkerTargetSet = false; // Reset flag for next walk
+            currentState = MiningState.FINDING_OPTIMAL_SPOT;
+            Microbot.status = "Finding optimal mining spot";
             return;
         }
 
         Microbot.status = "Walking to " + (config.usePresetLocation() ?
-            config.miningLocation().getName() : "mine");
+            config.miningLocation().getName() : "mine") + " (" + distanceToMine + " tiles)";
 
-        boolean walked = Rs2Walker.walkTo(miningLocation, 2);
-        if (walked && config.debugMode()) {
-            AntibanActivityLog.log("🚶 Walking to mining location", AntibanActivityLog.LogType.GENERAL);
+        // Don't interrupt if already moving
+        if (Rs2Player.isMoving()) {
+            return;
         }
 
-        sleep(600, 1200); // Wait between walk attempts
+        // Set the target once to start pathfinding, then call walkTo
+        if (!walkerTargetSet) {
+            if (config.debugMode()) {
+                AntibanActivityLog.log("🗺️ Starting walk to: " + (config.usePresetLocation() ?
+                    config.miningLocation().getName() : "mining location"), AntibanActivityLog.LogType.GENERAL);
+            }
+
+            // Call walkTo but don't wait for the result - just initiate the walk
+            Rs2Walker.walkTo(miningLocation, config.miningRadius());
+            walkerTargetSet = true;
+        }
+    }
+
+    private void handleFindingOptimalSpot(SmartMinerConfig config) {
+        Microbot.status = "Scanning area for ore rocks...";
+
+        // Scan a large area to find ALL rocks of the selected ore type
+        int searchRadius = 50; // Large scan radius to cover the entire mining area
+        OreType selectedOre = config.oreType();
+
+        if (!selectedOre.hasRequiredLevel()) {
+            Microbot.status = "Don't have required level for " + selectedOre.getOreName();
+            currentState = MiningState.MINING; // Fall back to mining at current location
+            return;
+        }
+
+        // Use current player location as scan center (where we just arrived)
+        WorldPoint scanCenter = Rs2Player.getWorldLocation();
+
+        List<GameObject> allRocks = Rs2GameObject.getGameObjects(
+            obj -> {
+                String name = getRockName(obj);
+                return name != null && name.equalsIgnoreCase(selectedOre.getRockName());
+            },
+            scanCenter,
+            searchRadius
+        );
+
+        if (allRocks.isEmpty()) {
+            Microbot.status = "No " + selectedOre.getOreName() + " rocks found in area";
+            currentState = MiningState.MINING;
+            return;
+        }
+
+        Microbot.status = "Found " + allRocks.size() + " " + selectedOre.getOreName() + " rocks, finding densest cluster...";
+
+        // Find the densest cluster of rocks
+        WorldPoint optimalSpot = findDensestCluster(allRocks, config);
+
+        if (optimalSpot != null) {
+            int distanceToOptimal = Rs2Player.getWorldLocation().distanceTo(optimalSpot);
+
+            if (distanceToOptimal > 2) {
+                // Walk to the optimal spot
+                Microbot.status = "Walking to densest cluster (" + distanceToOptimal + " tiles)";
+                Rs2Walker.walkTo(optimalSpot, 1);
+
+                if (config.debugMode()) {
+                    int rocksInRadius = (int) allRocks.stream()
+                        .filter(r -> r.getWorldLocation().distanceTo(optimalSpot) <= config.miningRadius())
+                        .count();
+                    AntibanActivityLog.log("🎯 Moving to densest cluster with " + rocksInRadius + " rocks within radius",
+                        AntibanActivityLog.LogType.GENERAL);
+                }
+            }
+
+            // Update mining location to optimal spot
+            miningLocation = optimalSpot;
+
+            // Set effective mining radius to 3-4 tiles to cover just the cluster we found
+            effectiveMiningRadius = 4;
+
+            Microbot.status = "Positioned at optimal mining spot (radius: " + effectiveMiningRadius + ")";
+
+            if (config.debugMode()) {
+                AntibanActivityLog.log("📍 Effective mining radius set to " + effectiveMiningRadius + " tiles",
+                    AntibanActivityLog.LogType.GENERAL);
+            }
+        }
+
+        currentState = MiningState.MINING;
+    }
+
+    /**
+     * Finds the densest cluster of rocks by prioritizing:
+     * 1. Clusters with 3+ rocks close together
+     * 2. Clusters with 2 rocks close together
+     * 3. Single rocks if no clusters found
+     */
+    private WorldPoint findDensestCluster(List<GameObject> rocks, SmartMinerConfig config) {
+        if (rocks.isEmpty()) return null;
+
+        WorldPoint currentLocation = Rs2Player.getWorldLocation();
+        int miningRadius = config.miningRadius();
+
+        // Try to find best cluster with 3+ rocks first
+        WorldPoint bestSpot = findClusterWithMinRocks(rocks, miningRadius, 3);
+        if (bestSpot != null) {
+            Microbot.log("Found cluster with 3+ rocks");
+            return bestSpot;
+        }
+
+        // Fall back to 2 rocks
+        bestSpot = findClusterWithMinRocks(rocks, miningRadius, 2);
+        if (bestSpot != null) {
+            Microbot.log("Found cluster with 2+ rocks");
+            return bestSpot;
+        }
+
+        // Fall back to single rock (closest one)
+        Microbot.log("No clusters found, using closest rock");
+        GameObject closestRock = rocks.stream()
+            .min((r1, r2) -> Integer.compare(
+                currentLocation.distanceTo(r1.getWorldLocation()),
+                currentLocation.distanceTo(r2.getWorldLocation())
+            ))
+            .orElse(null);
+
+        return closestRock != null ? closestRock.getWorldLocation() : currentLocation;
+    }
+
+    /**
+     * Finds the best position that has at least minRockCount rocks within mining radius
+     * Returns the position with the most rocks, with preference for tighter clusters
+     */
+    private WorldPoint findClusterWithMinRocks(List<GameObject> rocks, int miningRadius, int minRockCount) {
+        WorldPoint bestSpot = null;
+        int maxRocksFound = 0;
+        double minAvgDistance = Double.MAX_VALUE;
+
+        // For each rock, check how many other rocks are nearby
+        for (GameObject rock : rocks) {
+            WorldPoint candidate = rock.getWorldLocation();
+            List<GameObject> nearbyRocks = new ArrayList<>();
+            double totalDistance = 0;
+
+            for (GameObject otherRock : rocks) {
+                int distance = candidate.distanceTo(otherRock.getWorldLocation());
+                if (distance <= miningRadius) {
+                    nearbyRocks.add(otherRock);
+                    totalDistance += distance;
+                }
+            }
+
+            int rockCount = nearbyRocks.size();
+            double avgDistance = rockCount > 0 ? totalDistance / rockCount : Double.MAX_VALUE;
+
+            // Check if this is a better cluster
+            if (rockCount >= minRockCount) {
+                // Prefer more rocks, or if same count, prefer tighter cluster (lower avg distance)
+                if (rockCount > maxRocksFound ||
+                    (rockCount == maxRocksFound && avgDistance < minAvgDistance)) {
+                    maxRocksFound = rockCount;
+                    minAvgDistance = avgDistance;
+                    bestSpot = candidate;
+                }
+            }
+        }
+
+        return bestSpot;
     }
 
     private void handleMining(SmartMinerConfig config) {
@@ -369,12 +534,13 @@ public class SmartMinerScript extends Script {
     }
 
     // Helper methods
-    public static List<GameObject> getMinableRocksInRadius(SmartMinerConfig config) {
+    public List<GameObject> getMinableRocksInRadius(SmartMinerConfig config) {
         List<OreType> selectedOres = getSelectedOreTypes(config);
         if (selectedOres.isEmpty()) return new ArrayList<>();
 
         WorldPoint playerLocation = Rs2Player.getWorldLocation();
-        int radius = config.miningRadius();
+        // Use effective radius if set (after finding optimal spot), otherwise use config radius
+        int radius = effectiveMiningRadius > 0 ? effectiveMiningRadius : config.miningRadius();
 
         List<GameObject> minableRocks = new ArrayList<>();
 
@@ -399,18 +565,7 @@ public class SmartMinerScript extends Script {
 
     public static List<OreType> getSelectedOreTypes(SmartMinerConfig config) {
         List<OreType> selected = new ArrayList<>();
-
-        if (config.mineCopper()) selected.add(OreType.COPPER);
-        if (config.mineTin()) selected.add(OreType.TIN);
-        if (config.mineClay()) selected.add(OreType.CLAY);
-        if (config.mineIron()) selected.add(OreType.IRON);
-        if (config.mineSilver()) selected.add(OreType.SILVER);
-        if (config.mineCoal()) selected.add(OreType.COAL);
-        if (config.mineGold()) selected.add(OreType.GOLD);
-        if (config.mineMithril()) selected.add(OreType.MITHRIL);
-        if (config.mineAdamantite()) selected.add(OreType.ADAMANTITE);
-        if (config.mineRunite()) selected.add(OreType.RUNITE);
-
+        selected.add(config.oreType());
         return selected;
     }
 
@@ -512,86 +667,106 @@ public class SmartMinerScript extends Script {
     }
 
     private void scheduleAntibanMonitoring(SmartMinerConfig config) {
-        // Monitor for mouse movements and other antiban activities
+        // REAL antiban actions - actually performs Rs2 API calls
         scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
-                if (!config.debugMode()) return;
+                if (!Microbot.isLoggedIn()) return;
                 if (currentState != MiningState.MINING && currentState != MiningState.WALKING_TO_MINE) return;
+                if (Rs2Player.isMoving() || Rs2Player.isAnimating()) return; // Don't interrupt actions
 
-                // MUCH more active antiban logging with higher probabilities
-
-                // Fatigue simulation - kicks in more often
-                if (config.simulateFatigue() && Rs2AntibanSettings.simulateFatigue) {
-                    if (random.nextDouble() < 0.15) { // 15% chance per check
-                        AntibanActivityLog.logFatigueSlowdown();
+                // Mouse off screen - ACTUALLY moves mouse (reduced frequency)
+                if (config.moveMouseOffScreen()) {
+                    if (random.nextDouble() < 0.06) { // 6% chance every 5s
+                        Rs2Antiban.moveMouseOffScreen();
+                        if (config.debugMode()) {
+                            AntibanActivityLog.logMouseOffScreen();
+                        }
+                        sleep(800, 1500);
                     }
                 }
 
-                // Attention span - more realistic human distraction
-                if (config.simulateAttentionSpan() && Rs2AntibanSettings.simulateAttentionSpan) {
-                    if (random.nextDouble() < 0.12) { // 12% chance per check
-                        AntibanActivityLog.logAttentionLapse();
-                    }
-                }
-
-                // Mouse off screen - humans look away frequently
-                if (config.moveMouseOffScreen() && Rs2AntibanSettings.moveMouseOffScreen) {
-                    if (random.nextDouble() < 0.20) { // 20% chance per check
-                        AntibanActivityLog.logMouseOffScreen();
-                    }
-                }
-
-                // Random mouse movement - very common for real players
+                // Random mouse movement - ACTUALLY moves mouse (reduced frequency)
                 if (config.moveMouseRandomly()) {
-                    if (random.nextDouble() < 0.25) { // 25% chance per check
-                        String[] locations = {
-                            "inventory", "minimap", "chat box", "skill tab",
-                            "combat tab", "prayer tab", "spell book", "friends list",
-                            "clan chat", "equipment", "world map", "music player"
-                        };
-                        AntibanActivityLog.logRandomMouseMovement(locations[random.nextInt(locations.length)]);
-                    }
-                }
-
-                // Behavioral variability - random actions
-                if (config.behavioralVariability() && Rs2AntibanSettings.behavioralVariability) {
-                    if (random.nextDouble() < 0.10) { // 10% chance
-                        String[] behaviors = {
-                            "Checking XP", "Looking at stats", "Hovering over items",
-                            "Moving camera", "Checking minimap", "Reading chat"
-                        };
-                        AntibanActivityLog.logBehaviorVariation(behaviors[random.nextInt(behaviors.length)]);
-                    }
-                }
-
-                // Profile switching
-                if (config.profileSwitching() && Rs2AntibanSettings.profileSwitching) {
                     if (random.nextDouble() < 0.08) { // 8% chance
-                        String[] profiles = {"Efficient", "Relaxed", "Focused", "Distracted", "Tired"};
-                        AntibanActivityLog.logProfileSwitch(profiles[random.nextInt(profiles.length)]);
+                        Rs2Antiban.moveMouseRandomly();
+                        if (config.debugMode()) {
+                            String[] locations = {"inventory", "minimap", "chatbox", "skills tab"};
+                            AntibanActivityLog.logRandomMouseMovement(locations[random.nextInt(locations.length)]);
+                        }
+                        sleep(400, 900);
                     }
                 }
 
-                // Simulate mistakes - rare but happens
-                if (config.simulateMistakes() && Rs2AntibanSettings.simulateMistakes) {
+                // Tab switching - ACTUALLY switches tabs (reduced frequency)
+                if (config.behavioralVariability()) {
+                    if (random.nextDouble() < 0.04) { // 4% chance
+                        InterfaceTab currentTab = Rs2Tab.getCurrentTab();
+                        InterfaceTab[] tabs = {InterfaceTab.SKILLS, InterfaceTab.COMBAT, InterfaceTab.EQUIPMENT, InterfaceTab.PRAYER};
+                        InterfaceTab randomTab = tabs[random.nextInt(tabs.length)];
+
+                        if (currentTab != randomTab) {
+                            Rs2Tab.switchTo(randomTab);
+                            if (config.debugMode()) {
+                                AntibanActivityLog.logBehaviorVariation("Checked " + randomTab.name().toLowerCase() + " tab");
+                            }
+                            sleep(600, 1200);
+                            Rs2Tab.switchTo(InterfaceTab.INVENTORY); // Switch back
+                        }
+                    }
+                }
+
+                // Camera movement - ACTUALLY rotates camera (reduced frequency)
+                if (config.behavioralVariability()) {
                     if (random.nextDouble() < 0.05) { // 5% chance
-                        String[] mistakes = {
-                            "Misclick detected", "Hovered wrong rock",
-                            "Clicked too fast", "Moved mouse erratically"
-                        };
-                        AntibanActivityLog.logMistake(mistakes[random.nextInt(mistakes.length)]);
+                        int currentYaw = Rs2Camera.getYaw();
+                        int randomYaw = random.nextInt(2048); // 0-2047 range
+                        Rs2Camera.setYaw(randomYaw);
+                        if (config.debugMode()) {
+                            AntibanActivityLog.logBehaviorVariation("Rotated camera");
+                        }
+                        sleep(500, 1000);
+                    }
+                }
+
+                // Fatigue simulation - log only (behavioral)
+                if (config.simulateFatigue()) {
+                    if (random.nextDouble() < 0.06) {
+                        if (config.debugMode()) {
+                            AntibanActivityLog.logFatigueSlowdown();
+                        }
+                    }
+                }
+
+                // Attention span - log only (behavioral)
+                if (config.simulateAttentionSpan()) {
+                    if (random.nextDouble() < 0.04) {
+                        if (config.debugMode()) {
+                            AntibanActivityLog.logAttentionLapse();
+                        }
+                    }
+                }
+
+                // Profile switching - log only (internal state)
+                if (config.profileSwitching()) {
+                    if (random.nextDouble() < 0.03) {
+                        if (config.debugMode()) {
+                            String[] profiles = {"Efficient", "Relaxed", "Focused"};
+                            AntibanActivityLog.logProfileSwitch(profiles[random.nextInt(profiles.length)]);
+                        }
                     }
                 }
 
             } catch (Exception e) {
-                // Ignore errors in monitoring
+                Microbot.log("Antiban error: " + e.getMessage());
             }
-        }, 3000, 3000, TimeUnit.MILLISECONDS); // Check every 3 seconds (more frequent)
+        }, 5000, 5000, TimeUnit.MILLISECONDS); // Check every 5 seconds (reduced from 3s)
     }
 
     @Override
     public void shutdown() {
         super.shutdown();
+        Rs2Walker.setTarget(null); // Clear webwalker target
         Rs2Antiban.resetAntibanSettings();
+        AntibanActivityLog.clear();
     }
 }

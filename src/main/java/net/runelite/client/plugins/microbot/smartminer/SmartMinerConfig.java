@@ -123,113 +123,14 @@ public interface SmartMinerConfig extends Config {
     // ===== ORE SELECTION =====
 
     @ConfigItem(
-            keyName = "mineCopper",
-            name = "Mine Copper",
-            description = "Mine copper ore",
+            keyName = "oreType",
+            name = "Ore Type",
+            description = "Select which ore type to mine",
             position = 0,
             section = oreSection
     )
-    default boolean mineCopper() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineTin",
-            name = "Mine Tin",
-            description = "Mine tin ore",
-            position = 1,
-            section = oreSection
-    )
-    default boolean mineTin() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineClay",
-            name = "Mine Clay",
-            description = "Mine clay",
-            position = 2,
-            section = oreSection
-    )
-    default boolean mineClay() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineIron",
-            name = "Mine Iron",
-            description = "Mine iron ore",
-            position = 3,
-            section = oreSection
-    )
-    default boolean mineIron() {
-        return true;
-    }
-
-    @ConfigItem(
-            keyName = "mineSilver",
-            name = "Mine Silver",
-            description = "Mine silver ore",
-            position = 4,
-            section = oreSection
-    )
-    default boolean mineSilver() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineCoal",
-            name = "Mine Coal",
-            description = "Mine coal",
-            position = 5,
-            section = oreSection
-    )
-    default boolean mineCoal() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineGold",
-            name = "Mine Gold",
-            description = "Mine gold ore",
-            position = 6,
-            section = oreSection
-    )
-    default boolean mineGold() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineMithril",
-            name = "Mine Mithril",
-            description = "Mine mithril ore",
-            position = 7,
-            section = oreSection
-    )
-    default boolean mineMithril() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineAdamantite",
-            name = "Mine Adamantite",
-            description = "Mine adamantite ore",
-            position = 8,
-            section = oreSection
-    )
-    default boolean mineAdamantite() {
-        return false;
-    }
-
-    @ConfigItem(
-            keyName = "mineRunite",
-            name = "Mine Runite",
-            description = "Mine runite ore",
-            position = 9,
-            section = oreSection
-    )
-    default boolean mineRunite() {
-        return false;
+    default OreType oreType() {
+        return OreType.IRON;
     }
 
     // ===== BANKING & DROPPING =====
