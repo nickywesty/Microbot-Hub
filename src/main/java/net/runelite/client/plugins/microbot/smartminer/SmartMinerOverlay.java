@@ -327,6 +327,12 @@ public class SmartMinerOverlay extends OverlayPanel {
         SmartMinerScript script = plugin.getScript();
         if (script == null) return;
 
+        // Only highlight rocks when actually mining (not during scanning/walking)
+        if (SmartMinerScript.currentState != net.runelite.client.plugins.microbot.smartminer.enums.MiningState.MINING &&
+            SmartMinerScript.currentState != net.runelite.client.plugins.microbot.smartminer.enums.MiningState.WAITING_FOR_RESPAWN) {
+            return;
+        }
+
         var rocks = script.getMinableRocksInRadius(config);
 
         for (GameObject rock : rocks) {

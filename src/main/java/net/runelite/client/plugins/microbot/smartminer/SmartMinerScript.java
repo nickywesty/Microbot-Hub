@@ -57,6 +57,14 @@ public class SmartMinerScript extends Script {
         Rs2Antiban.resetAntibanSettings();
         setupAntiban(config);
 
+        // Reset all state on plugin start/restart
+        currentState = MiningState.STARTING;
+        miningLocation = null;
+        startingLocation = null;
+        lastMinedRock = null;
+        walkerTargetSet = false;
+        effectiveMiningRadius = 0;
+
         // Initialize session stats
         startTime = System.currentTimeMillis();
         oresMined = 0;
@@ -260,6 +268,16 @@ public class SmartMinerScript extends Script {
 
     private void handleFindingOptimalSpot(SmartMinerConfig config) {
         Microbot.status = "Scanning area for ore rocks...";
+
+        // Rotate camera to scan the area (4 cardinal directions)
+        int originalYaw = Rs2Camera.getYaw();
+        int[] scanYaws = {0, 512, 1024, 1536}; // North, East, South, West
+
+        Microbot.status = "Rotating camera to scan area...";
+        for (int yaw : scanYaws) {
+            Rs2Camera.setYaw(yaw);
+            sleep(400, 600); // Give time for objects to load
+        }
 
         // Scan a large area to find ALL rocks of the selected ore type
         int searchRadius = 50; // Large scan radius to cover the entire mining area
