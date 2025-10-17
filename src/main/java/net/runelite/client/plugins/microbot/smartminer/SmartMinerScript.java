@@ -40,6 +40,11 @@ public class SmartMinerScript extends Script {
     private static final long ROCK_RESPAWN_CHECK_DELAY = 3000; // 3 seconds minimum between clicks on same rock
     private boolean walkerTargetSet = false; // Track if we've set the walker target
     private int effectiveMiningRadius = 0; // Reduced radius once at optimal spot (3-4 tiles for cluster)
+    private long lastLocationCheck = 0;
+    private static final long LOCATION_CHECK_INTERVAL = 30000; // Check every 30 seconds
+    private static final int MAX_DISTANCE_FROM_MINE = 30; // Max tiles away from mining location
+    private long lastPlayerCheck = 0;
+    private static final long PLAYER_CHECK_INTERVAL = 5000; // Check for nearby players every 5 seconds
 
     // Session statistics
     public static long oresMined = 0;
@@ -64,6 +69,7 @@ public class SmartMinerScript extends Script {
         lastMinedRock = null;
         walkerTargetSet = false;
         effectiveMiningRadius = 0;
+        lastLocationCheck = 0;
 
         // Initialize session stats
         startTime = System.currentTimeMillis();
@@ -85,6 +91,15 @@ public class SmartMinerScript extends Script {
                     } else {
                         startingLocation = Rs2Player.getWorldLocation();
                         miningLocation = startingLocation;
+                    }
+                }
+
+                // Periodic location validation (every 30 seconds)
+                if (shouldCheckLocation()) {
+                    if (isDisplaced(config)) {
+                        Microbot.log("⚠️ Player displaced from mining area! Returning...");
+                        handleDisplacement(config);
+                        return;
                     }
                 }
 
@@ -267,7 +282,7 @@ public class SmartMinerScript extends Script {
     }
 
     private void handleFindingOptimalSpot(SmartMinerConfig config) {
-        Microbot.status = "Scanning area for ore rocks...";
+        Microbot.status = "Scanning for ore rocks...";
 
         OreType selectedOre = config.oreType();
         if (!selectedOre.hasRequiredLevel()) {
@@ -278,78 +293,70 @@ public class SmartMinerScript extends Script {
 
         WorldPoint scanCenter = Rs2Player.getWorldLocation();
         int searchRadius = 50;
-
-        // Smoothly pan camera while scanning for rocks
-        int startYaw = Rs2Camera.getYaw();
-        int totalRotation = 2048; // Full 360 degree rotation
-        int stepSize = 64; // Smaller steps for smoother panning (about 11 degrees per step)
-        int pauseBetweenSteps = random(200, 400); // Natural variation in panning speed
-
         List<GameObject> allRocks = new ArrayList<>();
-        int rocksFound = 0;
-        int stepsWithoutNewRocks = 0;
 
-        Microbot.status = "Panning camera to scan for " + selectedOre.getOreName() + "...";
+        // Do a quick 3-angle scan (current + 2 more angles for good coverage)
+        int startYaw = Rs2Camera.getYaw();
+        int[] scanAngles = {0, 682, 1365}; // Current, 120°, 240° (full coverage)
 
-        // Pan camera smoothly while looking for rocks
-        for (int angle = 0; angle < totalRotation; angle += stepSize) {
-            int currentYaw = (startYaw + angle) % 2048;
-            Rs2Camera.setYaw(currentYaw);
-            sleep(pauseBetweenSteps);
+        for (int i = 0; i < scanAngles.length; i++) {
+            if (i > 0) {
+                // Rotate camera for additional angles
+                int targetYaw = (startYaw + scanAngles[i]) % 2048;
+                Rs2Camera.setYaw(targetYaw);
+                sleep(400, 600); // Quick pause for objects to load
+            }
 
-            // Scan for rocks at current camera angle
-            List<GameObject> newRocks = Rs2GameObject.getGameObjects(
-                obj -> {
-                    String name = getRockName(obj);
-                    return name != null && name.equalsIgnoreCase(selectedOre.getRockName());
-                },
-                scanCenter,
-                searchRadius
-            );
+            // Scan for rocks at this angle
+            List<GameObject> newRocks = scanForRocks(selectedOre, scanCenter, searchRadius);
 
-            // Add any newly discovered rocks
+            // Merge new rocks (avoid duplicates by WorldPoint)
             for (GameObject rock : newRocks) {
-                if (!allRocks.contains(rock)) {
+                WorldPoint rockLoc = rock.getWorldLocation();
+                boolean isDuplicate = allRocks.stream()
+                    .anyMatch(r -> r.getWorldLocation().equals(rockLoc));
+
+                if (!isDuplicate) {
                     allRocks.add(rock);
-                    rocksFound++;
                 }
-            }
-
-            // Check if we have enough rocks for a good cluster
-            if (rocksFound >= 3) {
-                // Try to find a cluster with current rocks
-                WorldPoint potentialSpot = findClusterWithMinRocks(allRocks, config.miningRadius(), 3);
-                if (potentialSpot != null) {
-                    // Found a good cluster, stop panning
-                    Microbot.status = "Found cluster with 3+ rocks!";
-                    if (config.debugMode()) {
-                        AntibanActivityLog.log("✓ Stopped panning - found suitable cluster",
-                            AntibanActivityLog.LogType.GENERAL);
-                    }
-                    break;
-                }
-            }
-
-            // If we haven't found new rocks in a while, continue but track it
-            if (rocksFound > 0) {
-                int previousCount = rocksFound;
-                // Count will update next iteration
-            }
-
-            // Update status periodically
-            if (angle % (stepSize * 4) == 0) {
-                Microbot.status = "Scanning... found " + rocksFound + " " + selectedOre.getOreName() + " rocks";
             }
         }
 
         if (allRocks.isEmpty()) {
-            Microbot.status = "No " + selectedOre.getOreName() + " rocks found in area";
+            Microbot.status = "No " + selectedOre.getOreName() + " rocks found";
             currentState = MiningState.MINING;
             return;
         }
 
-        Microbot.status = "Found " + allRocks.size() + " " + selectedOre.getOreName() + " rocks total";
+        Microbot.status = "Found " + allRocks.size() + " rocks, finding best cluster...";
 
+        if (config.debugMode()) {
+            AntibanActivityLog.log("Scan found " + allRocks.size() + " " + selectedOre.getOreName() + " rocks",
+                AntibanActivityLog.LogType.GENERAL);
+        }
+
+        // Position at the optimal spot (no redundant checks)
+        positionAtOptimalSpot(allRocks, config);
+    }
+
+    /**
+     * Scans for rocks of the given ore type in the specified radius
+     */
+    private List<GameObject> scanForRocks(OreType oreType, WorldPoint center, int radius) {
+        return Rs2GameObject.getGameObjects(
+            obj -> {
+                String name = getRockName(obj);
+                return name != null && name.equalsIgnoreCase(oreType.getRockName());
+            },
+            center,
+            radius
+        );
+    }
+
+    /**
+     * Positions the player at the optimal mining spot based on found rocks
+     */
+    private void positionAtOptimalSpot(List<GameObject> allRocks, SmartMinerConfig config) {
         // Find the densest cluster of rocks
         WorldPoint optimalSpot = findDensestCluster(allRocks, config);
 
@@ -590,6 +597,55 @@ public class SmartMinerScript extends Script {
         if (!rocks.isEmpty()) {
             currentState = MiningState.MINING;
         }
+    }
+
+    // Location validation methods
+    private boolean shouldCheckLocation() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastLocationCheck >= LOCATION_CHECK_INTERVAL) {
+            lastLocationCheck = currentTime;
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isDisplaced(SmartMinerConfig config) {
+        // Don't check if we're intentionally walking or banking
+        if (currentState == MiningState.WALKING_TO_BANK ||
+            currentState == MiningState.BANKING ||
+            currentState == MiningState.WALKING_TO_MINE ||
+            currentState == MiningState.STARTING) {
+            return false;
+        }
+
+        // Don't check if we don't have a mining location set yet
+        if (miningLocation == null) {
+            return false;
+        }
+
+        WorldPoint currentLocation = Rs2Player.getWorldLocation();
+        int distance = currentLocation.distanceTo(miningLocation);
+
+        // If we're too far from the mining location, we're displaced
+        return distance > MAX_DISTANCE_FROM_MINE;
+    }
+
+    private void handleDisplacement(SmartMinerConfig config) {
+        Microbot.status = "Displaced from mining area - returning...";
+
+        // Reset state to walk back to mining location
+        walkerTargetSet = false;
+        effectiveMiningRadius = 0; // Reset effective radius, will re-scan on arrival
+
+        if (config.debugMode()) {
+            WorldPoint currentLoc = Rs2Player.getWorldLocation();
+            int distance = currentLoc.distanceTo(miningLocation);
+            AntibanActivityLog.log("⚠️ Displacement detected: " + distance + " tiles from mining location",
+                AntibanActivityLog.LogType.GENERAL);
+        }
+
+        // Go back to finding optimal spot state (which will walk there first if needed)
+        currentState = MiningState.WALKING_TO_MINE;
     }
 
     // Helper methods
