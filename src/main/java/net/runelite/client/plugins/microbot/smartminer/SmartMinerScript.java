@@ -269,37 +269,78 @@ public class SmartMinerScript extends Script {
     private void handleFindingOptimalSpot(SmartMinerConfig config) {
         Microbot.status = "Scanning area for ore rocks...";
 
-        // Rotate camera to scan the area (4 cardinal directions)
-        int originalYaw = Rs2Camera.getYaw();
-        int[] scanYaws = {0, 512, 1024, 1536}; // North, East, South, West
-
-        Microbot.status = "Rotating camera to scan area...";
-        for (int yaw : scanYaws) {
-            Rs2Camera.setYaw(yaw);
-            sleep(400, 600); // Give time for objects to load
-        }
-
-        // Scan a large area to find ALL rocks of the selected ore type
-        int searchRadius = 50; // Large scan radius to cover the entire mining area
         OreType selectedOre = config.oreType();
-
         if (!selectedOre.hasRequiredLevel()) {
             Microbot.status = "Don't have required level for " + selectedOre.getOreName();
-            currentState = MiningState.MINING; // Fall back to mining at current location
+            currentState = MiningState.MINING;
             return;
         }
 
-        // Use current player location as scan center (where we just arrived)
         WorldPoint scanCenter = Rs2Player.getWorldLocation();
+        int searchRadius = 50;
 
-        List<GameObject> allRocks = Rs2GameObject.getGameObjects(
-            obj -> {
-                String name = getRockName(obj);
-                return name != null && name.equalsIgnoreCase(selectedOre.getRockName());
-            },
-            scanCenter,
-            searchRadius
-        );
+        // Smoothly pan camera while scanning for rocks
+        int startYaw = Rs2Camera.getYaw();
+        int totalRotation = 2048; // Full 360 degree rotation
+        int stepSize = 64; // Smaller steps for smoother panning (about 11 degrees per step)
+        int pauseBetweenSteps = random(200, 400); // Natural variation in panning speed
+
+        List<GameObject> allRocks = new ArrayList<>();
+        int rocksFound = 0;
+        int stepsWithoutNewRocks = 0;
+
+        Microbot.status = "Panning camera to scan for " + selectedOre.getOreName() + "...";
+
+        // Pan camera smoothly while looking for rocks
+        for (int angle = 0; angle < totalRotation; angle += stepSize) {
+            int currentYaw = (startYaw + angle) % 2048;
+            Rs2Camera.setYaw(currentYaw);
+            sleep(pauseBetweenSteps);
+
+            // Scan for rocks at current camera angle
+            List<GameObject> newRocks = Rs2GameObject.getGameObjects(
+                obj -> {
+                    String name = getRockName(obj);
+                    return name != null && name.equalsIgnoreCase(selectedOre.getRockName());
+                },
+                scanCenter,
+                searchRadius
+            );
+
+            // Add any newly discovered rocks
+            for (GameObject rock : newRocks) {
+                if (!allRocks.contains(rock)) {
+                    allRocks.add(rock);
+                    rocksFound++;
+                }
+            }
+
+            // Check if we have enough rocks for a good cluster
+            if (rocksFound >= 3) {
+                // Try to find a cluster with current rocks
+                WorldPoint potentialSpot = findClusterWithMinRocks(allRocks, config.miningRadius(), 3);
+                if (potentialSpot != null) {
+                    // Found a good cluster, stop panning
+                    Microbot.status = "Found cluster with 3+ rocks!";
+                    if (config.debugMode()) {
+                        AntibanActivityLog.log("✓ Stopped panning - found suitable cluster",
+                            AntibanActivityLog.LogType.GENERAL);
+                    }
+                    break;
+                }
+            }
+
+            // If we haven't found new rocks in a while, continue but track it
+            if (rocksFound > 0) {
+                int previousCount = rocksFound;
+                // Count will update next iteration
+            }
+
+            // Update status periodically
+            if (angle % (stepSize * 4) == 0) {
+                Microbot.status = "Scanning... found " + rocksFound + " " + selectedOre.getOreName() + " rocks";
+            }
+        }
 
         if (allRocks.isEmpty()) {
             Microbot.status = "No " + selectedOre.getOreName() + " rocks found in area";
@@ -307,7 +348,7 @@ public class SmartMinerScript extends Script {
             return;
         }
 
-        Microbot.status = "Found " + allRocks.size() + " " + selectedOre.getOreName() + " rocks, finding densest cluster...";
+        Microbot.status = "Found " + allRocks.size() + " " + selectedOre.getOreName() + " rocks total";
 
         // Find the densest cluster of rocks
         WorldPoint optimalSpot = findDensestCluster(allRocks, config);
