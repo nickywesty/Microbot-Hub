@@ -90,6 +90,37 @@ public interface WildernessNickyConfig extends Config {
     )
     default boolean useProjectilePrayerSwitching() { return true; }
 
+    @ConfigItem(
+        keyName = "soloMode",
+        name = "Solo Mode (Instant Logout)",
+        description = "<html>SOLO RUNNING: Instantly attempt logout when SKULLED attackable player detected nearby.<br>" +
+                      "If logout fails (combat), will run to safe area while eating/praying and keep trying to logout.<br>" +
+                      "Disable for mass running.</html>",
+        position = 16,
+        section = escapeSection
+    )
+    default boolean soloMode() { return false; }
+
+    @ConfigItem(
+        keyName = "clanMemberHitThreshold",
+        name = "Clan Member Hit Threshold",
+        description = "Number of hits from FC/clan members before escaping. Higher = more lenient for friendly mass.",
+        position = 17,
+        section = escapeSection
+    )
+    @Range(min = 2, max = 20)
+    default int clanMemberHitThreshold() { return 6; }
+
+    @ConfigItem(
+        keyName = "nonClanHitThreshold",
+        name = "Non-Clan Hit Threshold",
+        description = "Number of hits from NON-clan players before escaping. Lower = safer from actual PKers.",
+        position = 18,
+        section = escapeSection
+    )
+    @Range(min = 1, max = 10)
+    default int nonClanHitThreshold() { return 2; }
+
     // === Looting Settings ===
     @ConfigSection(
         name = "Looting Settings",

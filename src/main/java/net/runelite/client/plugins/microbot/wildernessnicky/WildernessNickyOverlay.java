@@ -59,7 +59,14 @@ public class WildernessNickyOverlay extends OverlayPanel {
             }
         }
 
-        panelComponent.setPreferredSize(new Dimension(250, baseHeight + bankedLootHeight + projectileHeight + escapeReasonHeight));
+        // Add height for looting bag contents (if present)
+        int lootingBagHeight = 0;
+        if (!script.getLootingBagContents().isEmpty()) {
+            int itemsShown = Math.min(3, script.getLootingBagContents().size());
+            lootingBagHeight = (itemsShown + 1) * 20; // +1 for "Bag Contents:" header
+        }
+
+        panelComponent.setPreferredSize(new Dimension(250, baseHeight + bankedLootHeight + projectileHeight + escapeReasonHeight + lootingBagHeight));
 
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text("\uD83D\uDC2C Wilderness Agility v" + (script != null ? script.VERSION : "1.6.0") + " \uD83D\uDC2C")
@@ -86,6 +93,28 @@ public class WildernessNickyOverlay extends OverlayPanel {
                 .leftColor(new Color(0x2ECC40)) // money green
                 .rightColor(new Color(0x2ECC40))
                 .build());
+
+        // Show looting bag contents if not empty
+        if (!script.getLootingBagContents().isEmpty()) {
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("  Bag Contents:")
+                    .leftColor(new Color(0x90EE90)) // light green
+                    .build());
+
+            // Show top 3 items in looting bag
+            script.getLootingBagContents().entrySet().stream()
+                    .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue())) // Sort by quantity descending
+                    .limit(3)
+                    .forEach(entry -> {
+                        panelComponent.getChildren().add(LineComponent.builder()
+                                .left("    " + entry.getKey())
+                                .right(String.format("%,d", entry.getValue()))
+                                .leftColor(Color.LIGHT_GRAY)
+                                .rightColor(Color.WHITE)
+                                .build());
+                    });
+        }
+
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Previous Lap Time")
                 .right(script.getPreviousLapTime())

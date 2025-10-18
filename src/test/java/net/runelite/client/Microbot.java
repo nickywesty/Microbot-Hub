@@ -10,12 +10,16 @@ import net.runelite.client.plugins.microbot.astralrc.AstralRunesPlugin;
 import net.runelite.client.plugins.microbot.autofishing.AutoFishingPlugin;
 import net.runelite.client.plugins.microbot.example.ExamplePlugin;
 import net.runelite.client.plugins.microbot.wildernessnicky.WildernessNickyPlugin;
+import net.runelite.client.plugins.microbot.qualityoflife.QoLPlugin;
+import net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin;
 
 public class Microbot
 {
 
 	private static final Class<?>[] debugPlugins = {
-            WildernessNickyPlugin.class
+            WildernessNickyPlugin.class,
+            QoLPlugin.class,
+            PlayerMonitorPlugin.class
 	};
 
     public static void main(String[] args) throws Exception
