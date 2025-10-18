@@ -9,13 +9,13 @@ import net.runelite.client.plugins.microbot.aiofighter.AIOFighterPlugin;
 import net.runelite.client.plugins.microbot.astralrc.AstralRunesPlugin;
 import net.runelite.client.plugins.microbot.autofishing.AutoFishingPlugin;
 import net.runelite.client.plugins.microbot.example.ExamplePlugin;
-import net.runelite.client.plugins.microbot.smartminer.SmartMinerPlugin;
+import net.runelite.client.plugins.microbot.wildernessnicky.WildernessNickyPlugin;
 
 public class Microbot
 {
 
 	private static final Class<?>[] debugPlugins = {
-            SmartMinerPlugin.class
+            WildernessNickyPlugin.class
 	};
 
     public static void main(String[] args) throws Exception

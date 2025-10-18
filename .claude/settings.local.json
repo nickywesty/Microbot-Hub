@@ -1,15 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Read(//mnt/c/Users/Elite/Desktop/Coding/Microbot/**)",
-      "Read(//mnt/c/Users/Elite/Desktop/Microbot Practice/**)",
-      "Read(//mnt/c/Users/Elite/Desktop/Coding/**)",
-      "Read(//mnt/c/Users/Elite/Desktop/**)",
-      "Bash(mkdir:*)",
-      "Bash(./gradlew build:*)",
-      "Bash(gradle build:*)",
-      "Bash(find:*)",
-      "Bash(bash gradlew build:*)"
+      "Bash(javac:*)",
+      "Bash(find \"/mnt/c/Users/Elite/Desktop/Microbot Practice/Microbot-Hub\" -name \"build.gradle\" -exec grep -l \"microbot-api\\|util\" {})",
+      "Bash(./gradlew classes --quiet)",
+      "Bash(bash gradlew classes --quiet)",
+      "Bash(./gradlew :compileWildernessnickyJava)",
+      "Bash(bash gradlew :compileWildernessnickyJava)"
     ],
     "deny": [],
     "ask": []
