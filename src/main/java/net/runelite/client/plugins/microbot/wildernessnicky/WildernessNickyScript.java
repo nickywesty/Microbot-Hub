@@ -77,6 +77,7 @@ public final class WildernessNickyScript extends Script {
     private static final int LOOTING_BAG_CLOSED_ID = 11941;
     private static final int LOOTING_BAG_OPEN_ID = 22586;
     private static final int UNDERGROUND_OBJECT_ID = 53225;
+    private static final int FALLING_ANIMATION = 7155; // Animation ID when player falls from obstacle
     private static final WorldPoint START_POINT = new WorldPoint(3004, 3936, 0);
     private static final WorldPoint DISPENSER_POINT = new WorldPoint(3004, 3936, 0);
 
@@ -807,25 +808,41 @@ public final class WildernessNickyScript extends Script {
                 // Update teleblock status
                 updateTeleBlockStatus();
 
-                // Handle prayer switching (if in wilderness and has prayer)
-                if (Rs2Pvp.isInWilderness() && Rs2Player.hasPrayerPoints()) {
-                    long currentTime = System.currentTimeMillis();
-
-                    if (config.useProjectilePrayerSwitching()) {
-                        // PRIMARY: Projectile-based switching (check every 50ms for ranged/magic)
-                        if (currentTime - lastProjectileCheckTime >= PROJECTILE_CHECK_INTERVAL) {
-                            handleProjectilePrayerSwitching();
-                            lastProjectileCheckTime = currentTime;
+                // Handle prayer switching (if in wilderness)
+                // Note: We attempt prayer switching even if prayer points check fails, as the check itself may fail due to skill cache issues
+                if (Rs2Pvp.isInWilderness()) {
+                    try {
+                        // Only skip if we can reliably determine player has 0 prayer points
+                        boolean hasPrayer = true;
+                        try {
+                            hasPrayer = Rs2Player.hasPrayerPoints();
+                        } catch (Exception e) {
+                            // If prayer check fails, assume we have prayer and continue (better to try than skip)
+                            Microbot.log("[WildernessNicky] Prayer check failed, assuming prayer available: " + e.getMessage());
                         }
 
-                        // FALLBACK: Melee detection for attacks without projectiles
-                        // Only runs if no projectiles are being tracked
-                        if (incomingProjectiles.isEmpty()) {
-                            handleMeleeDetection();
+                        if (hasPrayer) {
+                            long currentTime = System.currentTimeMillis();
+
+                            if (config.useProjectilePrayerSwitching()) {
+                                // PRIMARY: Projectile-based switching (check every 50ms for ranged/magic)
+                                if (currentTime - lastProjectileCheckTime >= PROJECTILE_CHECK_INTERVAL) {
+                                    handleProjectilePrayerSwitching();
+                                    lastProjectileCheckTime = currentTime;
+                                }
+
+                                // FALLBACK: Melee detection for attacks without projectiles
+                                // Only runs if no projectiles are being tracked
+                                if (incomingProjectiles.isEmpty()) {
+                                    handleMeleeDetection();
+                                }
+                            } else {
+                                // Legacy: weapon-based switching only (not recommended)
+                                handle1TickPrayerSwitching();
+                            }
                         }
-                    } else {
-                        // Legacy: weapon-based switching only (not recommended)
-                        handle1TickPrayerSwitching();
+                    } catch (Exception e) {
+                        Microbot.log("[WildernessNicky] Error in prayer switching handler: " + e.getMessage());
                     }
                 }
 
@@ -1149,12 +1166,35 @@ public final class WildernessNickyScript extends Script {
     private TileObject getObstacleObj(int index) {
         return Rs2GameObject.getAll(o -> o.getId() == obstacles.get(index).getObjectId(), 104).stream().findFirst().orElse(null);
     }
+
+    /**
+     * Checks if the player is currently falling from an obstacle
+     * @return true if player is in the falling animation
+     */
+    private boolean isFalling() {
+        return Rs2Player.getAnimation() == FALLING_ANIMATION;
+    }
+
+    /**
+     * Checks if the player is in the underground pit OR currently falling
+     * @return true if player is in pit or falling
+     */
     private boolean isInUndergroundPit() {
         // Check for the underground object that only exists in the pit
-        return Rs2GameObject.getAll(o -> o.getId() == UNDERGROUND_OBJECT_ID, 104).stream().findFirst().orElse(null) != null;
+        boolean inPit = Rs2GameObject.getAll(o -> o.getId() == UNDERGROUND_OBJECT_ID, 104).stream().findFirst().orElse(null) != null;
+        // Also check if player is falling - early detection before hitting the pit
+        boolean falling = isFalling();
+        return inPit || falling;
     }
     private void recoverFromPit() {
-        // First check if we're still in the pit using game object detection
+        // If player is currently falling, wait for them to land
+        if (isFalling()) {
+            Microbot.log("[WildernessNicky] Player is falling - waiting for landing...");
+            sleepUntil(() -> !isFalling(), 3000);
+            return;
+        }
+
+        // Check if we're still in the pit using game object detection
         if (isInUndergroundPit()) {
             // Immediately refresh ladder object before attempting to interact
             List<TileObject> ladders = Rs2GameObject.getAll(o -> o.getId() == 17385, 104);
@@ -1166,6 +1206,7 @@ public final class WildernessNickyScript extends Script {
                     // Refresh ladder object again just before interaction
                     List<TileObject> laddersNow = Rs2GameObject.getAll(o -> o.getId() == 17385, 104);
                     ladderObj = laddersNow.isEmpty() ? null : laddersNow.get(0);
+                    Microbot.log("[WildernessNicky] Climbing out of pit...");
                     Rs2GameObject.interact(ladderObj, "Climb-up");
                     lastLadderInteractTime = now;
                 }
