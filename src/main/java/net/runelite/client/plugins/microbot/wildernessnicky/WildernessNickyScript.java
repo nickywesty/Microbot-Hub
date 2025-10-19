@@ -451,11 +451,9 @@ public final class WildernessNickyScript extends Script {
                 // ===== SOLO MODE - INSTANT LOGOUT FOR ATTACKABLE PLAYERS OR COMBAT =====
                 // Only check if not already attempting logout to avoid resetting timer
                 if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
-                    // Skip if in safe zone (Mage Bank, banking areas, etc.)
-                    if (isInSafeZone()) {
-                        // Don't trigger logout in safe zones
-                        return;
-                    }
+                    // Skip solo mode checks if in safe zone (Mage Bank, banking areas, etc.)
+                    if (!isInSafeZone()) {
+                        // Only do player detection if NOT in safe zone
 
                     // Check for ANY attackable player threat (not just skulled)
                     boolean playerThreat = detectAttackablePlayer();
@@ -551,6 +549,7 @@ public final class WildernessNickyScript extends Script {
                         logoutAttemptStartTime = System.currentTimeMillis();
                         triggerPhoenixEscape("Skeleton/NPC combat - finding safe spot to logout");
                     }
+                    } // End of !isInSafeZone() check
                 }
 
                 // PROACTIVE PLAYER DETECTION - Scan for PKers before they attack
@@ -3252,23 +3251,46 @@ public final class WildernessNickyScript extends Script {
 
         // Single-step banking logic
         if (!Rs2Bank.isOpen()) {
-            // Walk to bank first if not nearby
-            if (!Rs2Bank.walkToBank()) {
-                Microbot.log("[WildernessNicky] Walking to bank...");
-                sleep(1000);
-                return;
+            WorldPoint playerLoc = Rs2Player.getWorldLocation();
+
+            // Check if we're in Mage Bank (underground plane 0)
+            boolean inMageBank = playerLoc != null && playerLoc.getPlane() == 0 &&
+                                playerLoc.getX() >= 2530 && playerLoc.getX() <= 2540 &&
+                                playerLoc.getY() >= 4708 && playerLoc.getY() <= 4718;
+
+            if (inMageBank) {
+                // Mage Bank uses a bank chest, not a booth
+                Microbot.log("[WildernessNicky] In Mage Bank - attempting to open bank...");
+
+                // Rs2Bank.openBank() should find any nearby bank object (chest, booth, etc.)
+                Rs2Bank.openBank();
+                sleepUntil(Rs2Bank::isOpen, 10000);
+
+                if (!Rs2Bank.isOpen()) {
+                    Microbot.log("[WildernessNicky] ⚠️ Failed to open Mage Bank chest, retrying...");
+                    return;
+                }
+
+                Microbot.log("[WildernessNicky] ✅ Mage Bank opened successfully!");
+            } else {
+                // Regular bank (use normal banking)
+                if (!Rs2Bank.walkToBank()) {
+                    Microbot.log("[WildernessNicky] Walking to bank...");
+                    sleep(1000);
+                    return;
+                }
+
+                Microbot.log("[WildernessNicky] Near bank, attempting to open...");
+                Rs2Bank.openBank();
+                sleepUntil(Rs2Bank::isOpen, 20000);
+
+                if (!Rs2Bank.isOpen()) {
+                    Microbot.log("[WildernessNicky] ⚠️ Failed to open bank, will retry...");
+                    return;
+                }
+
+                Microbot.log("[WildernessNicky] ✅ Bank opened successfully!");
             }
-
-            Microbot.log("[WildernessNicky] Near bank, attempting to open...");
-            Rs2Bank.openBank();
-            sleepUntil(Rs2Bank::isOpen, 20000);
-
-            if (!Rs2Bank.isOpen()) {
-                Microbot.log("[WildernessNicky] ⚠️ Failed to open bank, will retry...");
-                return;
-            }
-
-            Microbot.log("[WildernessNicky] ✅ Bank opened successfully!");
         }
 
         // Reset entrance fee flag when banking (starting new session)
@@ -3364,22 +3386,55 @@ public final class WildernessNickyScript extends Script {
             sleepUntil(() -> Rs2Inventory.hasItem(COINS_ID) && Rs2Inventory.itemQuantity(COINS_ID) >= 150000, 3000);
         }
         
-        // Withdraw Ice Plateau TP (if enabled) - ORDER 5
+        // Withdraw Phoenix Necklace (if enabled) - ORDER 5
+        if (config.phoenixEscape() && !Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID) && !Rs2Equipment.isWearing("Phoenix necklace")) {
+            Microbot.log("[WildernessNicky] Withdrawing Phoenix necklace...");
+            Rs2Bank.withdrawOne(PHOENIX_NECKLACE_ID);
+            sleepUntil(() -> Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID), 3000);
+        }
+
+        // Withdraw Ice Plateau TP (if enabled) - ORDER 6
         if (config.useIcePlateauTp() && !Rs2Inventory.hasItem(TELEPORT_ID)) {
             Rs2Bank.withdrawOne(TELEPORT_ID);
             sleepUntil(() -> Rs2Inventory.hasItem(TELEPORT_ID), 3000);
         }
-        
+
         // Confirm all items are present
-        boolean venomPresent = config.withdrawVenomProtection() == WildernessNickyConfig.VenomProtectionOption.None || 
+        boolean venomPresent = config.withdrawVenomProtection() == WildernessNickyConfig.VenomProtectionOption.None ||
             (config.withdrawVenomProtection().getItemId() != -1 && Rs2Inventory.hasItem(config.withdrawVenomProtection().getItemId()));
-        
+
+        boolean phoenixPresent = !config.phoenixEscape() || Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID) || Rs2Equipment.isWearing("Phoenix necklace");
+
         boolean allPresent = (!config.withdrawKnife() || Rs2Inventory.hasItem(KNIFE_ID))
             && (!config.withdrawCoins() || Rs2Inventory.hasItem(COINS_ID))
             && (!config.useIcePlateauTp() || Rs2Inventory.hasItem(TELEPORT_ID))
             && (!config.withdrawLootingBag() || Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) || Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID))
-            && venomPresent;
-        if (!allPresent) return;
+            && venomPresent
+            && phoenixPresent;
+
+        if (!allPresent) {
+            Microbot.log("[WildernessNicky] ⚠️ Not all required items present:");
+            if (config.withdrawKnife() && !Rs2Inventory.hasItem(KNIFE_ID)) {
+                Microbot.log("  ❌ Missing: Knife");
+            }
+            if (config.withdrawCoins() && !Rs2Inventory.hasItem(COINS_ID)) {
+                Microbot.log("  ❌ Missing: Coins (need 150k)");
+            }
+            if (config.useIcePlateauTp() && !Rs2Inventory.hasItem(TELEPORT_ID)) {
+                Microbot.log("  ❌ Missing: Ice Plateau Teleport");
+            }
+            if (config.withdrawLootingBag() && !Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) && !Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+                Microbot.log("  ❌ Missing: Looting Bag");
+            }
+            if (!venomPresent) {
+                Microbot.log("  ❌ Missing: Venom Protection");
+            }
+            if (!phoenixPresent) {
+                Microbot.log("  ❌ Missing: Phoenix Necklace");
+            }
+            Microbot.log("[WildernessNicky] Retrying item withdrawal...");
+            return;
+        }
 
         Rs2Bank.closeBank();
         sleep(getActionDelay());
