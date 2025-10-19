@@ -608,17 +608,44 @@ public final class WildernessNickyScript extends Script {
                             return; // Skip logout, continue running course
                         }
 
-                        // REAL PKer THREAT - Instant logout attempt
+                        // REAL PKer THREAT - Need to logout and world hop
                         attemptingLogout = true;
                         logoutAttemptStartTime = System.currentTimeMillis();
 
                         String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
-                        Microbot.log("[WildernessNicky] ⚠️ " + reason + " - attempting instant logout!");
+                        Microbot.log("[WildernessNicky] ⚠️ " + reason + " - need to logout and world hop!");
                         Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
 
-                        // Try to logout
-                        Rs2Player.logout();
-                        sleep(600); // Wait 1 tick
+                        // Check if we're in combat with NPCs (skeletons) that prevent logout
+                        Actor interactingWith = Microbot.getClient().getLocalPlayer().getInteracting();
+                        boolean inNpcCombat = interactingWith != null && !(interactingWith instanceof net.runelite.api.Player);
+
+                        if (inNpcCombat) {
+                            // In combat with NPCs - need to run away from skeletons first
+                            Microbot.log("[WildernessNicky] 🦴 In NPC combat (skeleton) - running to safe area before logout...");
+
+                            // Run back toward start/dispenser area (safe from skeletons)
+                            WorldPoint currentLoc = Rs2Player.getWorldLocation();
+                            if (currentLoc != null && currentLoc.distanceTo(START_POINT) > 5) {
+                                Microbot.log("[WildernessNicky] 🏃 Running toward start area to escape skeleton combat");
+                                Rs2Walker.walkTo(START_POINT, 3);
+                                sleep(600);
+                            }
+
+                            // Try logout anyway (might work if we broke combat)
+                            Rs2Player.logout();
+                            sleep(600);
+
+                            // If still in combat, keep moving and return to try again next cycle
+                            if (Microbot.isLoggedIn() && Microbot.getClient().getLocalPlayer().getInteracting() != null) {
+                                Microbot.log("[WildernessNicky] ⚠️ Still in skeleton combat - will retry next cycle");
+                                return; // Return to keep trying next cycle
+                            }
+                        } else {
+                            // Not in NPC combat - try direct logout
+                            Rs2Player.logout();
+                            sleep(600); // Wait 1 tick
+                        }
 
                         // Check if logout succeeded (player is no longer logged in)
                         if (!Microbot.isLoggedIn()) {
@@ -681,10 +708,33 @@ public final class WildernessNickyScript extends Script {
                             }
                             return;
                         } else {
-                            // Logout failed (in combat), trigger escape with logout priority
-                            // IMPORTANT: attemptingLogout = true is already set, so escape handler will keep trying
-                            Microbot.log("[WildernessNicky] ❌ Logout failed (in combat) - triggering escape with logout priority");
-                            triggerPhoenixEscape(reason + " - logout failed, will keep trying to logout while escaping");
+                            // Logout failed (in combat) - keep trying to logout while moving
+                            Microbot.log("[WildernessNicky] ❌ Logout failed (in combat) - will keep spamming logout attempts");
+
+                            // Check if we've been trying to logout for too long
+                            long timeSinceLogoutAttempt = System.currentTimeMillis() - logoutAttemptStartTime;
+
+                            if (timeSinceLogoutAttempt > 10000) {
+                                // After 10 seconds of trying, give up and stop plugin
+                                Microbot.log("[WildernessNicky] ⚠️ Failed to logout after 10 seconds - stopping plugin to prevent death");
+                                sleep(1000);
+                                Microbot.stopPlugin(plugin);
+                                return;
+                            }
+
+                            // Keep spamming logout while moving randomly to break combat
+                            Rs2Player.logout();
+
+                            // Move randomly to try to break combat
+                            if (!Rs2Player.isMoving()) {
+                                WorldPoint currentLoc = Rs2Player.getWorldLocation();
+                                if (currentLoc != null) {
+                                    // Move in a random direction
+                                    int randomX = currentLoc.getX() + (new Random().nextInt(3) - 1);
+                                    int randomY = currentLoc.getY() + (new Random().nextInt(3) - 1);
+                                    Rs2Walker.walkTo(new WorldPoint(randomX, randomY, currentLoc.getPlane()), 0);
+                                }
+                            }
                         }
                     } else if (isNpcCombat) {
                         // SKELETON/NPC COMBAT - Run to safe spot to logout
@@ -2780,9 +2830,27 @@ public final class WildernessNickyScript extends Script {
             eatFood();
         }
 
-        // ===== STEP 3: SPAM LOGOUT ATTEMPT =====
+        // ===== STEP 3: ESCAPE FROM SKELETON COMBAT + SPAM LOGOUT =====
+        // Check if we're in combat with NPCs (skeletons) that prevent logout
+        Actor interactingWith = Microbot.getClient().getLocalPlayer().getInteracting();
+        boolean inSkeletonCombat = interactingWith != null && !(interactingWith instanceof net.runelite.api.Player);
+
+        if (inSkeletonCombat) {
+            // In skeleton combat - run toward start area to break combat
+            WorldPoint currentLoc = Rs2Player.getWorldLocation();
+            if (currentLoc != null && currentLoc.distanceTo(START_POINT) > 5) {
+                // Far from start - run toward it
+                if (!Rs2Player.isMoving()) {
+                    Microbot.log("[WildernessNicky] 🦴 In skeleton combat - running to safe area (start)");
+                    Rs2Walker.walkTo(START_POINT, 3);
+                }
+            }
+        }
+
+        // Always spam logout (works instantly if combat breaks)
         // Every 100ms - tries to logout using Rs2Player.logout() (direct menu entry invocation)
         // This is the fastest logout method available in the API
+        // IMPORTANT: We keep trying to logout throughout the ENTIRE escape, not just for 3 seconds
         Rs2Player.logout();
         sleep(100); // Small delay to prevent excessive CPU usage
 
@@ -2845,23 +2913,21 @@ public final class WildernessNickyScript extends Script {
         // Prayer activation and food eating already handled at top of method
 
         // ===== STEP 5: PHYSICAL ESCAPE TO MAGE BANK =====
-        // Only proceed with physical escape if we've tried logging out long enough
+        // Continue physical escape while STILL trying to logout (no timeout)
+        // We spam logout throughout the entire escape until we reach Mage Bank
+        // Only log the transition once
         if (attemptingLogout) {
             long logoutAttemptTime = System.currentTimeMillis() - logoutAttemptStartTime;
 
-            if (logoutAttemptTime < MAX_LOGOUT_ATTEMPT_TIME) {
-                // Still within logout attempt window - don't proceed to physical escape yet
-                Microbot.log("[WildernessNicky] 🔄 Logout attempt " + (logoutAttemptTime/1000) + "s / " + (MAX_LOGOUT_ATTEMPT_TIME/1000) + "s... (combat detected)");
-                return; // Keep trying logout (already tried above)
+            if (logoutAttemptTime >= MAX_LOGOUT_ATTEMPT_TIME) {
+                // Log once that we're now doing physical escape while still trying logout
+                Microbot.log("[WildernessNicky] ⏱️ Still in combat after 3s - moving to safety while spamming logout");
+                attemptingLogout = false; // Just to stop this log from repeating
+                // DON'T stop trying to logout - it happens at line 2809 every 100ms
             } else {
-                // Logout timeout reached - proceed with physical escape
-                Microbot.log("[WildernessNicky] ⏱️ Logout timeout - proceeding with physical escape to Mage Bank");
-                attemptingLogout = false;
-                // Fall through to physical escape steps below
+                // Still within initial 3 second window - don't do physical escape yet
+                return; // Keep trying logout without moving
             }
-        } else {
-            // Not in logout mode, proceed directly to physical escape
-            Microbot.log("[WildernessNicky] 🏃 Beginning physical escape to Mage Bank...");
         }
 
         // SAFETY CHECK: Allow escape mode to be cancelled if conditions are met
@@ -2967,7 +3033,20 @@ public final class WildernessNickyScript extends Script {
                     // Not past gate yet - need to open it
                     int distanceToGate = currentLoc.distanceTo(GATE_AREA);
 
-                    if (distanceToGate <= 5) {
+                    // Check if player fell off to the right (east of gate area)
+                    boolean fellOffRight = currentLoc.getX() > GATE_AREA.getX() + 2;
+
+                    if (fellOffRight && distanceToGate > 5) {
+                        // Fell off to the right - need to walk back west to gate area
+                        Microbot.log("[WildernessNicky] ⚠️ FELL OFF RIGHT - Walking back west to gate (Distance: " + distanceToGate + " tiles)");
+                        Microbot.log("[WildernessNicky] Current position: " + currentLoc + ", Gate: " + GATE_AREA);
+
+                        // Walk directly west toward the gate area
+                        if (!Rs2Player.isMoving()) {
+                            Rs2Walker.walkTo(GATE_AREA, 1); // Walk to exact gate location
+                            sleep(1200, 1500); // Wait for walk to start
+                        }
+                    } else if (distanceToGate <= 5) {
                         // Close enough - try to open gate
                         // Find the CLOSEST gate to the gate area to avoid clicking wrong gates
                         List<TileObject> gates = Rs2GameObject.getAll(o -> o.getId() == GATE_OBJECT_ID, 104);
@@ -2995,12 +3074,12 @@ public final class WildernessNickyScript extends Script {
                             Microbot.log("[WildernessNicky] ⚠️ Gate opening skipped - continuing");
                         }
                     } else {
-                        // Too far from gate - walk towards it (recovery for falling off)
+                        // Too far from gate - walk towards it (general recovery)
                         if (!Rs2Player.isMoving() || distanceToGate > 10) {
                             Microbot.log("[WildernessNicky] 🚶 Walking back to gate (Distance: " + distanceToGate + " tiles)");
 
-                            // Walk directly to the GATE_AREA point (not to a gate object, which might be the wrong one)
-                            Rs2Walker.walkTo(GATE_AREA, 2);
+                            // Walk directly to the GATE_AREA point
+                            Rs2Walker.walkTo(GATE_AREA, 1);
                             sleep(600); // Wait for walk to start
                         }
                     }
@@ -3635,18 +3714,33 @@ public final class WildernessNickyScript extends Script {
             int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
             if (coinCount >= 150000) {
                 Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Attempting to deposit 150k entrance fee into dispenser");
-                Rs2Inventory.use(COINS_ID);
-                sleep(400);
-                Rs2GameObject.interact(dispenserObj, "Use");
-                sleep(getActionDelay());
 
-                // Wait for payment to complete and set flag
-                boolean paymentSuccess = sleepUntil(() -> Rs2Inventory.itemQuantity(COINS_ID) < coinCount, getXpTimeout());
-                if (paymentSuccess) {
-                    entranceFeePaid = true;
-                    Microbot.log("[WildernessNicky] ✅ Entrance fee paid successfully!");
+                // Click coins first
+                Rs2Inventory.interact(COINS_ID, "Use");
+                sleep(600, 800);
+
+                // Then click dispenser with "Use" action
+                boolean interacted = Rs2GameObject.interact(dispenserObj, "Use");
+                if (interacted) {
+                    Microbot.log("[WildernessNicky] Successfully clicked dispenser with coins");
+                    sleep(1200); // Wait for animation/interaction
+
+                    // Wait for payment to complete (coins decrease)
+                    boolean paymentSuccess = sleepUntil(() -> Rs2Inventory.itemQuantity(COINS_ID) < coinCount, 5000);
+
+                    if (paymentSuccess) {
+                        int coinsAfter = Rs2Inventory.itemQuantity(COINS_ID);
+                        int coinsSpent = coinCount - coinsAfter;
+                        entranceFeePaid = true;
+                        Microbot.log("[WildernessNicky] ✅ Entrance fee paid successfully! (Spent: " + coinsSpent + " gp)");
+                    } else {
+                        // Payment didn't go through - stay in this state to retry
+                        Microbot.log("[WildernessNicky] ⚠️ Entrance fee payment failed (coins didn't decrease) - retrying...");
+                        return; // Stay in WALK_TO_COURSE state to retry
+                    }
                 } else {
-                    Microbot.log("[WildernessNicky] ⚠️ Entrance fee payment may have failed - will retry next time");
+                    Microbot.log("[WildernessNicky] ⚠️ Failed to interact with dispenser - retrying...");
+                    return; // Stay in WALK_TO_COURSE state to retry
                 }
             } else {
                 // Not enough coins - need to go bank/regear
@@ -3658,7 +3752,8 @@ public final class WildernessNickyScript extends Script {
         } else if (entranceFeePaid) {
             Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Entrance fee already paid - skipping payment");
         } else {
-            Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Dispenser object not found!");
+            Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Dispenser object not found - retrying...");
+            return; // Stay in this state to retry finding dispenser
         }
         currentState = ObstacleState.PIPE;
     }
