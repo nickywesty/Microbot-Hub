@@ -10,6 +10,11 @@ import net.runelite.client.config.ConfigSection;
 @ConfigGroup("wildernessagility")
 @ConfigInformation(
     "<h3>🌊 Nickywest Wilderness Agility v2.0.0</h3>" +
+    "<b>🎮 Choose Your Play Mode:</b><br>" +
+    "• <b>Proactive Only:</b> Scans for PKers, escapes before attack<br>" +
+    "• <b>Solo Mode:</b> Instant logout + world hops (max safety)<br>" +
+    "• <b>Mass Mode:</b> Wait for hits, clan-friendly thresholds<br>" +
+    "<br>" +
     "<b>🛡️ ADVANCED ANTI-PK FEATURES:</b><br>" +
     "• Detects attackable players (skulled OR non-skulled)<br>" +
     "• Safe spot detection - finds safe tiles to logout<br>" +
@@ -17,19 +22,16 @@ import net.runelite.client.config.ConfigSection;
     "• Auto-prayers during escape (1-tick projectile switching)<br>" +
     "• Logout priority: tries 3s before running to bank<br>" +
     "• Eats food automatically while escaping<br>" +
-    "• World hops 3x in solo mode to find empty course<br>" +
     "<br>" +
     "<b>💰 Other Features:</b><br>" +
     "• Real-time Looting Bag Tracking (GUI shows contents)<br>" +
     "• Auto-regear on death or missing coins<br>" +
     "• Entrance fee validation & management<br>" +
-    "• Clan vs non-clan hit detection<br>" +
     "<br>" +
     "<b>Quick Start:</b><br>" +
     "• Inventory: 150k coins, knife, looting bag, phoenix necklace<br>" +
-    "• Enable 'Start at Course' if already at wilderness agility<br>" +
-    "• Solo mode: Enable for world hopping safety<br>" +
-    "• Mass mode: Disable solo, set clan hit threshold higher<br>"
+    "• Set Play Mode to match your playstyle<br>" +
+    "• Enable 'Start at Course' if already at wilderness agility<br>"
 )
 public interface WildernessNickyConfig extends Config {
 
@@ -58,20 +60,34 @@ public interface WildernessNickyConfig extends Config {
     )
     String escapeSection = "escapeSection";
 
+    enum PlayMode {
+        PROACTIVE_ONLY("Proactive Detection Only"),
+        SOLO("Solo Mode - Instant Logout"),
+        MASS("Mass Mode - Wait for Hits");
+
+        private final String displayName;
+
+        PlayMode(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
+
     @ConfigItem(
-        keyName = "soloMode",
-        name = "🌍 Solo Mode (World Hopping)",
-        description = "<html><b>ADVANCED v2.0:</b> Maximum anti-PK protection!<br>" +
-                      "• Detects ANY attackable player (skulled or not)<br>" +
-                      "• Skeleton combat: Finds safe spot to logout<br>" +
-                      "• PKer detected: Instant logout attempt<br>" +
-                      "• If in combat: Runs to safe spot, eats, prays<br>" +
-                      "• World hops 3x to find empty course<br>" +
-                      "• Stops plugin if no empty world found</html>",
+        keyName = "playMode",
+        name = "🎮 Play Mode",
+        description = "<html><b>Choose your playstyle:</b><br>" +
+                      "<b>Proactive Only:</b> Scans for PKers, escapes before attack<br>" +
+                      "<b>Solo Mode:</b> Instant logout on ANY player, world hops 3x<br>" +
+                      "<b>Mass Mode:</b> Wait for hits, clan-friendly thresholds</html>",
         position = 11,
         section = escapeSection
     )
-    default boolean soloMode() { return false; }
+    default PlayMode playMode() { return PlayMode.PROACTIVE_ONLY; }
 
     @ConfigItem(
         keyName = "phoenixEscape",
@@ -92,41 +108,54 @@ public interface WildernessNickyConfig extends Config {
     @Range(min = 0, max = 100)
     default int leaveAtHealthPercent() { return 0; }
 
-    @ConfigItem(
-        keyName = "waitForHitBeforeEscape",
-        name = "⚔️ Wait for Hit (Mass Mode)",
-        description = "<html><b>MASS-FRIENDLY:</b> Only escape after taking PvP damage from a player.<br>" +
-                      "Ignores agility fail damage. Perfect for mass agility runs.</html>",
-        position = 14,
-        section = escapeSection
-    )
-    default boolean waitForHitBeforeEscape() { return false; }
-
+    // === MASS MODE SPECIFIC OPTIONS ===
     @ConfigItem(
         keyName = "clanMemberHitThreshold",
-        name = "Clan Hit Threshold",
-        description = "Hits from FC/clan members before escaping (higher = more lenient for mass)",
-        position = 15,
-        section = escapeSection
+        name = "  ⚔️ Clan Hit Threshold",
+        description = "<html><b>MASS MODE ONLY:</b><br>Hits from FC/clan members before escaping.<br>Higher = more lenient for mass runs</html>",
+        position = 14,
+        section = escapeSection,
+        hidden = true
     )
     @Range(min = 2, max = 20)
     default int clanMemberHitThreshold() { return 6; }
 
     @ConfigItem(
+        keyName = "clanMemberHitThresholdVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean clanMemberHitThresholdVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
         keyName = "nonClanHitThreshold",
-        name = "Non-Clan Hit Threshold",
-        description = "Hits from NON-clan players before escaping (lower = safer from PKers)",
-        position = 16,
-        section = escapeSection
+        name = "  ⚔️ Non-Clan Hit Threshold",
+        description = "<html><b>MASS MODE ONLY:</b><br>Hits from NON-clan players before escaping.<br>Lower = safer from PKers</html>",
+        position = 15,
+        section = escapeSection,
+        hidden = true
     )
     @Range(min = 1, max = 10)
     default int nonClanHitThreshold() { return 2; }
 
     @ConfigItem(
+        keyName = "nonClanHitThresholdVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean nonClanHitThresholdVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
         keyName = "enableProactivePlayerDetection",
         name = "🔍 Proactive PKer Detection",
-        description = "Scan for PKers every 5 seconds. Escape BEFORE being attacked if threatening player within 15 tiles.",
-        position = 17,
+        description = "<html>Scan for PKers every 5 seconds.<br>Escape BEFORE being attacked if threatening player within 15 tiles.<br><b>Note:</b> Disabled in Mass Mode (uses hit detection instead)</html>",
+        position = 16,
         section = escapeSection
     )
     default boolean enableProactivePlayerDetection() { return true; }

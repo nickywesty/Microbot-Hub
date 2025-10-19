@@ -336,6 +336,9 @@ public final class WildernessNickyScript extends Script {
         // Initialize startup grace period timer
         scriptStartTime = System.currentTimeMillis();
 
+        // Log selected play mode
+        Microbot.log("[WildernessNicky] 🎮 Play Mode: " + config.playMode().toString());
+
         if (config.debugMode()) {
             currentState = ObstacleState.valueOf(config.debugStartState().name());
             Microbot.log("[DEBUG MODE] Starting in state: " + currentState);
@@ -428,9 +431,9 @@ public final class WildernessNickyScript extends Script {
                     }
                 }
 
-                // ===== WAIT FOR HIT MODE (MASS-FRIENDLY) =====
-                // NEW: Separate thresholds for clan members vs non-clan players
-                if (config.waitForHitBeforeEscape() && !emergencyEscapeTriggered && !gracePeriodActive) {
+                // ===== MASS MODE - WAIT FOR HIT THRESHOLDS =====
+                // Separate thresholds for clan members vs non-clan players
+                if (config.playMode() == WildernessNickyConfig.PlayMode.MASS && !emergencyEscapeTriggered && !gracePeriodActive) {
                     // Check non-clan hits first (more dangerous)
                     if (nonClanHitCount >= config.nonClanHitThreshold()) {
                         triggerPhoenixEscape("Took " + nonClanHitCount + " hits from NON-CLAN player (" + lastAttackerName + ")");
@@ -443,7 +446,7 @@ public final class WildernessNickyScript extends Script {
 
                 // ===== SOLO MODE - INSTANT LOGOUT FOR ATTACKABLE PLAYERS OR COMBAT =====
                 // Only check if not already attempting logout to avoid resetting timer
-                if (config.soloMode() && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
+                if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
                     // Check for ANY attackable player threat (not just skulled)
                     boolean playerThreat = detectAttackablePlayer();
                     Actor interacting = Microbot.getClient().getLocalPlayer().getInteracting();
@@ -540,8 +543,11 @@ public final class WildernessNickyScript extends Script {
                     }
                 }
 
-                // PROACTIVE PLAYER DETECTION - Scan for PKers before they attack (if wait for hit AND solo mode disabled)
-                if (config.enableProactivePlayerDetection() && !config.waitForHitBeforeEscape() && !config.soloMode() && !emergencyEscapeTriggered) {
+                // PROACTIVE PLAYER DETECTION - Scan for PKers before they attack
+                // Only active in PROACTIVE_ONLY mode (disabled in MASS and SOLO modes)
+                if (config.enableProactivePlayerDetection() &&
+                    config.playMode() == WildernessNickyConfig.PlayMode.PROACTIVE_ONLY &&
+                    !emergencyEscapeTriggered) {
                     if (detectNearbyThreat()) {
                         triggerPhoenixEscape("Threatening player detected within 15 tiles (Proactive Detection)");
                     }
