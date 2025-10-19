@@ -2630,7 +2630,43 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
-     * Handles Emergency Escape logic - AGGRESSIVE logout attempts and prayers
+     * Handles emergency escape from PKers with advanced anti-PK features.
+     *
+     * <p><b>Key Features:</b></p>
+     * <ul>
+     *   <li><b>1-Tick Prayer Switching:</b> Automatically switches to correct protection prayer
+     *       (Melee/Range/Magic) based on incoming projectiles</li>
+     *   <li><b>Spam Logout:</b> Attempts logout every 100ms throughout entire escape</li>
+     *   <li><b>Continuous Movement:</b> Never stands still - always moving toward Mage Bank</li>
+     *   <li><b>Auto Food:</b> Eats food when HP drops below 60%</li>
+     *   <li><b>Smart Pathing:</b> Equip necklace → Climb rocks → Open gate → Run to Mage Bank</li>
+     * </ul>
+     *
+     * <p><b>Escape Flow:</b></p>
+     * <pre>
+     * Every 100ms loop:
+     *   1. Switch prayer (1-tick before projectile impact)
+     *   2. Eat food (if HP &lt; 60%)
+     *   3. Spam logout attempt
+     *   4. Check position & continue movement:
+     *      - Equip Phoenix necklace (while moving)
+     *      - Climb rocks (if in rock area)
+     *      - Open gate (if near gate)
+     *      - Walk to Mage Bank (continuous)
+     *   5. Repeat (no blocking waits)
+     * </pre>
+     *
+     * <p><b>Safety Features:</b></p>
+     * <ul>
+     *   <li>World hop after successful logout (Solo mode, up to 3 attempts)</li>
+     *   <li>Failsafe timeouts for each step (prevents getting stuck)</li>
+     *   <li>Force logout at Mage Bank safe zone</li>
+     *   <li>Emergency timeout after 3 minutes</li>
+     * </ul>
+     *
+     * @see #handleProjectilePrayerSwitching() for 1-tick prayer system
+     * @see #eatFood() for food consumption logic
+     * @see #resetEscapeMode() for cleanup after escape
      */
     private void handleEmergencyEscape() {
         if (!emergencyEscapeTriggered) {
@@ -2639,10 +2675,23 @@ public final class WildernessNickyScript extends Script {
 
         long timeSinceStart = System.currentTimeMillis() - emergencyEscapeStartTime;
 
-        // ALWAYS try to logout first (regardless of attemptingLogout flag)
-        // This is an emergency - try logging out every loop iteration
+        // ===== STEP 1: IMMEDIATE PRAYER SWITCHING (1-tick accuracy) =====
+        // Activates BEFORE logout check to ensure protection even during combat
+        if (config.useProjectilePrayerSwitching() && Rs2Player.hasPrayerPoints()) {
+            handleProjectilePrayerSwitching(); // Switches to correct prayer 1 tick before projectile hits
+        }
+
+        // ===== STEP 2: AUTO FOOD CONSUMPTION =====
+        // Maintains health above 60% throughout entire escape
+        if (Rs2Player.getHealthPercentage() < 60) {
+            eatFood();
+        }
+
+        // ===== STEP 3: SPAM LOGOUT ATTEMPT =====
+        // Every 100ms - tries to logout using Rs2Player.logout() (direct menu entry invocation)
+        // This is the fastest logout method available in the API
         Rs2Player.logout();
-        sleep(100);
+        sleep(100); // Small delay to prevent excessive CPU usage
 
         // Check if logout succeeded
         if (!Microbot.isLoggedIn()) {
@@ -2698,36 +2747,12 @@ public final class WildernessNickyScript extends Script {
             return;
         }
 
+        // ===== STEP 4: LOGOUT SUCCESS CHECK =====
         // If we're still here, logout failed - we're in combat
-        // IMMEDIATELY activate protection prayers based on attacker
-        Actor attacker = Microbot.getClient().getLocalPlayer().getInteracting();
-        if (attacker != null) {
-            if (attacker instanceof net.runelite.api.Player) {
-                // Being attacked by player - use Protect from Melee by default (most common)
-                // Projectile system will override if ranged/mage detected
-                if (Rs2Player.hasPrayerPoints() && config.useProjectilePrayerSwitching()) {
-                    if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
-                        Microbot.log("[WildernessNicky] 🛡️ Player attacking - activating Protect from Melee");
-                        switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
-                    }
-                }
-            } else if (attacker instanceof net.runelite.api.NPC) {
-                // Being attacked by NPC (skeleton) - use Protect from Melee
-                if (Rs2Player.hasPrayerPoints()) {
-                    if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
-                        Microbot.log("[WildernessNicky] 🛡️ NPC attacking - activating Protect from Melee");
-                        switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
-                    }
-                }
-            }
-        }
+        // Prayer activation and food eating already handled at top of method
 
-        // Eat food if low HP
-        if (Rs2Player.getHealthPercentage() < 60) {
-            eatFood();
-        }
-
-        // Check if we've been trying to logout long enough - if so, give up and run
+        // ===== STEP 5: PHYSICAL ESCAPE TO MAGE BANK =====
+        // Only proceed with physical escape if we've tried logging out long enough
         if (attemptingLogout) {
             long logoutAttemptTime = System.currentTimeMillis() - logoutAttemptStartTime;
 
@@ -2765,127 +2790,148 @@ public final class WildernessNickyScript extends Script {
             return;
         }
         
-        // Step 1: Equip necklace if found in inventory (with attempt counter)
-        if (!hasEquippedPhoenixNecklace && Rs2Inventory.hasItem("Phoenix necklace")) {
+        // ========================================
+        // ESCAPE STEP 1: EQUIP PHOENIX NECKLACE
+        // ========================================
+        // Equips Phoenix necklace while moving (NO blocking waits)
+        // Phoenix necklace teleports player to Edgeville if killed, saving items
+        if (!hasEquippedPhoenixNecklace && Rs2Inventory.hasItem("Phoenix necklace") && !Rs2Equipment.isWearing("Phoenix necklace")) {
             escapeEquipNecklaceAttempts++;
-            Microbot.log("[WildernessNicky] Emergency Escape Step 1: Equipping Phoenix necklace (Attempt " + escapeEquipNecklaceAttempts + "/" + MAX_ESCAPE_STEP_ATTEMPTS + ")");
 
             // Failsafe: Skip if too many attempts
             if (escapeEquipNecklaceAttempts > MAX_ESCAPE_STEP_ATTEMPTS) {
-                Microbot.log("[WildernessNicky] ⚠️ Failed to equip Phoenix necklace after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - skipping to next step");
+                Microbot.log("[WildernessNicky] ⚠️ Failed to equip Phoenix necklace after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - skipping");
                 hasEquippedPhoenixNecklace = true;
-                return;
+            } else {
+                Rs2Inventory.wield("Phoenix necklace");
+                Microbot.log("[WildernessNicky] 🔗 Equipping Phoenix necklace while escaping (Attempt " + escapeEquipNecklaceAttempts + ")");
             }
+        }
 
-            Rs2Inventory.wield("Phoenix necklace");
-            boolean equipped = sleepUntil(() -> Rs2Equipment.isWearing("Phoenix necklace"), 2000);
-
-            if (equipped) {
-                hasEquippedPhoenixNecklace = true;
-                Microbot.log("[WildernessNicky] ✅ Phoenix necklace equipped successfully");
-            }
-            return; // Wait for next loop iteration
+        // Mark as equipped if wearing (check during every iteration)
+        if (!hasEquippedPhoenixNecklace && Rs2Equipment.isWearing("Phoenix necklace")) {
+            hasEquippedPhoenixNecklace = true;
+            Microbot.log("[WildernessNicky] ✅ Phoenix necklace equipped");
         }
         
-        // Step 2: Check if player is in rock area and climb if needed (with attempt counter)
+        // ========================================
+        // ESCAPE STEP 2: NAVIGATE ROCK AREA
+        // ========================================
+        // Climbs rocks obstacle to progress toward gate (CONTINUOUS MOVEMENT - no standing still)
+        // Rock area is WorldArea(2991,3936 to 3001,3945) - final wilderness agility obstacle
         if (!hasClimbedRocks) {
-            escapeClimbRocksAttempts++;
             WorldArea rockArea = new WorldArea(SOUTH_WEST_CORNER, ROCK_AREA_WIDTH, ROCK_AREA_HEIGHT);
-            boolean isInArea = rockArea.contains(Rs2Player.getWorldLocation());
             WorldPoint currentLoc = Rs2Player.getWorldLocation();
+            boolean isInRockArea = currentLoc != null && rockArea.contains(currentLoc);
 
             // Initialize step timer
             if (escapeStep2StartTime == 0) {
                 escapeStep2StartTime = System.currentTimeMillis();
             }
 
-            // Failsafe: Skip if too many attempts OR timeout
+            // Failsafe: Skip if timeout (player might be past this already)
             long stepElapsedTime = System.currentTimeMillis() - escapeStep2StartTime;
-            if (escapeClimbRocksAttempts > MAX_ESCAPE_STEP_ATTEMPTS || stepElapsedTime > ESCAPE_STEP_TIMEOUT) {
-                Microbot.log("[WildernessNicky] ⚠️ Climbing rocks failed (Attempts: " + escapeClimbRocksAttempts + ", Time: " + (stepElapsedTime/1000) + "s) - skipping to next step");
+            if (stepElapsedTime > ESCAPE_STEP_TIMEOUT * 2) { // 20 seconds timeout
+                Microbot.log("[WildernessNicky] ⚠️ Rock area navigation timeout - skipping to gate");
                 hasClimbedRocks = true;
                 escapeStep2StartTime = 0;
-                return;
-            }
-
-            if (isInArea) {
-                Microbot.log("[WildernessNicky] Emergency Escape Step 2: Climbing rocks (Attempt " + escapeClimbRocksAttempts + "/" + MAX_ESCAPE_STEP_ATTEMPTS + ")");
-                Rs2GameObject.interact(ROCKS_OBJECT_ID, "Climb");
-                sleep(1200);
-                boolean climbedSuccessfully = sleepUntil(() -> !Rs2Player.isMoving(), 5000);
-
-                if (climbedSuccessfully) {
-                    hasClimbedRocks = true;
-                    escapeStep2StartTime = 0;
-                    Microbot.log("[WildernessNicky] ✅ Rocks climbed successfully");
+            } else if (isInRockArea) {
+                // We're IN the rock area - climb rocks
+                if (!Rs2Player.isMoving() || escapeClimbRocksAttempts == 0) {
+                    escapeClimbRocksAttempts++;
+                    Microbot.log("[WildernessNicky] 🧗 Climbing rocks (Attempt " + escapeClimbRocksAttempts + ")");
+                    Rs2GameObject.interact(ROCKS_OBJECT_ID, "Climb");
                 }
-                return;
+                // Don't wait - keep looping to maintain logout spam and prayer switching
+            } else if (currentLoc != null && currentLoc.distanceTo(GATE_AREA) <= 3) {
+                // Already past the rock area - mark as complete
+                hasClimbedRocks = true;
+                escapeStep2StartTime = 0;
+                Microbot.log("[WildernessNicky] ✅ Past rock area - continuing to gate");
             } else {
-                // Check if we're within 3 tiles of the gate area - consider it arrived
-                if (currentLoc != null && currentLoc.distanceTo(GATE_AREA) <= 3) {
-                    Microbot.log("[WildernessNicky] Emergency Escape Step 2: Arrived at gate area (within 3 tiles)");
-                    hasClimbedRocks = true;
-                    escapeStep2StartTime = 0;
-                    return;
+                // Not in rock area yet - keep walking toward gate
+                if (!Rs2Player.isMoving() || currentLoc.distanceTo(GATE_AREA) > 10) {
+                    Rs2Walker.walkTo(GATE_AREA, 4);
+                }
+            }
+        }
+        
+        // ========================================
+        // ESCAPE STEP 3: OPEN GATE
+        // ========================================
+        // Opens wilderness gate to access Mage Bank area (NO STANDING STILL - open and keep moving)
+        // Gate location: WorldPoint(2998, 3931, 0)
+        if (!hasOpenedGate && hasClimbedRocks) {
+            WorldPoint currentLoc = Rs2Player.getWorldLocation();
+
+            // Check if we're near gate area
+            if (currentLoc != null && currentLoc.distanceTo(GATE_AREA) <= 5) {
+                // Try to open gate if we can see it
+                TileObject gate = Rs2GameObject.getGameObject(GATE_OBJECT_ID);
+                if (gate != null && escapeOpenGateAttempts < MAX_ESCAPE_STEP_ATTEMPTS) {
+                    escapeOpenGateAttempts++;
+                    Microbot.log("[WildernessNicky] 🚪 Opening gate (Attempt " + escapeOpenGateAttempts + ")");
+                    Rs2GameObject.interact(GATE_OBJECT_ID, "Open");
+                } else if (escapeOpenGateAttempts >= MAX_ESCAPE_STEP_ATTEMPTS) {
+                    // Skip gate if too many attempts
+                    hasOpenedGate = true;
+                    Microbot.log("[WildernessNicky] ⚠️ Gate opening skipped - continuing");
                 }
 
-                Microbot.log("[WildernessNicky] Emergency Escape Step 2: Walking to gate area (Attempt " + escapeClimbRocksAttempts + "/" + MAX_ESCAPE_STEP_ATTEMPTS + ")");
-                Rs2Walker.walkTo(GATE_AREA, 4);
-                return;
+                // Check if we're past the gate (it's open or we're through)
+                if (currentLoc.distanceTo(new WorldPoint(2534, 4712, 0)) < currentLoc.distanceTo(GATE_AREA)) {
+                    hasOpenedGate = true;
+                    Microbot.log("[WildernessNicky] ✅ Past gate - heading to Mage Bank");
+                }
             }
         }
-        
-        // Step 3: Open gate (with attempt counter)
-        if (!hasOpenedGate) {
-            escapeOpenGateAttempts++;
-            Microbot.log("[WildernessNicky] Emergency Escape Step 3: Opening gate (Attempt " + escapeOpenGateAttempts + "/" + MAX_ESCAPE_STEP_ATTEMPTS + ")");
 
-            // Failsafe: Skip if too many attempts
-            if (escapeOpenGateAttempts > MAX_ESCAPE_STEP_ATTEMPTS) {
-                Microbot.log("[WildernessNicky] ⚠️ Failed to open gate after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - skipping to next step");
-                hasOpenedGate = true;
-                return;
-            }
-
-            sleepUntilOnClientThread(() -> Rs2GameObject.getGameObject(GATE_OBJECT_ID) != null, 3000);
-            Rs2GameObject.interact(GATE_OBJECT_ID, "Open");
-            sleep(1000);
-            hasOpenedGate = true;
-            Microbot.log("[WildernessNicky] ✅ Gate opened successfully");
-            return;
-        }
-
-        // Step 4: Walk to Mage Bank (with attempt counter)
-        escapeWalkToMageBankAttempts++;
-        Microbot.log("[WildernessNicky] Emergency Escape Step 4: Walking to Mage Bank (Attempt " + escapeWalkToMageBankAttempts + "/" + MAX_ESCAPE_STEP_ATTEMPTS + ")");
-
-        // Failsafe: Logout if too many walk attempts
-        if (escapeWalkToMageBankAttempts > MAX_ESCAPE_STEP_ATTEMPTS) {
-            Microbot.log("[WildernessNicky] ⚠️ Failed to reach Mage Bank after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - logging out for safety");
-            Rs2Player.logout();
-            return;
-        }
-
-        Rs2Walker.walkTo(new WorldPoint(2534, 4712, 0), 20); // Mage Bank coordinates
-        
-        // Check if we've reached Mage Bank area
+        // ========================================
+        // ESCAPE STEP 4: RUN TO MAGE BANK
+        // ========================================
+        // Final escape destination - Mage Bank safe zone (NEVER STOP - spam walk + logout)
+        // Mage Bank location: WorldPoint(2534, 4712, 0) - underground safe zone
+        // Safe zone radius: 10 tiles from bank
+        WorldPoint mageBankPoint = new WorldPoint(2534, 4712, 0);
         WorldPoint currentLoc = Rs2Player.getWorldLocation();
-        if (currentLoc != null && currentLoc.distanceTo(new WorldPoint(2534, 4712, 0)) <= 10) {
-            Microbot.log("[WildernessNicky] ✅ Successfully reached Mage Bank safely!");
-            Microbot.log("[WildernessNicky] 📋 Escape was triggered by: " + lastEscapeReason);
-            Microbot.log("[WildernessNicky] 🚪 Logging out for safety");
-            // Logout until successful (Netoxic's approach)
-            while (Microbot.isLoggedIn()) {
-                Rs2Player.logout();
-                sleepUntil(() -> !Microbot.isLoggedIn(), 300);
+
+        if (currentLoc != null) {
+            int distanceToBank = currentLoc.distanceTo(mageBankPoint);
+
+            // Check if we've reached Mage Bank safe zone
+            if (distanceToBank <= 10) {
+                Microbot.log("[WildernessNicky] ✅ Reached Mage Bank safe zone!");
+                Microbot.log("[WildernessNicky] 📋 Escape reason: " + lastEscapeReason);
+                Microbot.log("[WildernessNicky] 🚪 Forcing logout...");
+
+                // Force logout until successful
+                int logoutAttempts = 0;
+                while (Microbot.isLoggedIn() && logoutAttempts < 50) {
+                    Rs2Player.logout();
+                    sleep(100);
+                    logoutAttempts++;
+                }
+
+                // Reset escape state
+                resetEscapeMode();
+                return;
             }
-            // Reset escape state
-            emergencyEscapeTriggered = false;
-            emergencyEscapeStartTime = 0;
-            hasEquippedPhoenixNecklace = false;
-            hasClimbedRocks = false;
-            hasOpenedGate = false;
-            escapeStep2StartTime = 0;
+
+            // KEEP MOVING - if we're not moving or far from bank, walk there
+            if (!Rs2Player.isMoving() || distanceToBank > 5) {
+                escapeWalkToMageBankAttempts++;
+                if (escapeWalkToMageBankAttempts % 5 == 1) { // Log every 5 attempts to reduce spam
+                    Microbot.log("[WildernessNicky] 🏃 Running to Mage Bank (Distance: " + distanceToBank + " tiles)");
+                }
+                Rs2Walker.walkTo(mageBankPoint, 20);
+            }
+        }
+
+        // Failsafe: If we've been trying too long, force logout wherever we are
+        if (escapeWalkToMageBankAttempts > MAX_ESCAPE_STEP_ATTEMPTS * 10) { // 50 attempts
+            Microbot.log("[WildernessNicky] ⚠️ Escape timeout - forcing logout at current location");
+            Rs2Player.logout();
+            resetEscapeMode();
         }
     }
 
