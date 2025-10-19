@@ -62,7 +62,7 @@ public class WildernessNickyOverlay extends OverlayPanel {
         // Add height for looting bag contents (if present)
         int lootingBagHeight = 0;
         if (!script.getLootingBagContents().isEmpty()) {
-            int itemsShown = Math.min(3, script.getLootingBagContents().size());
+            int itemsShown = Math.min(5, script.getLootingBagContents().size());
             lootingBagHeight = (itemsShown + 1) * 20; // +1 for "Bag Contents:" header
         }
 
@@ -101,16 +101,15 @@ public class WildernessNickyOverlay extends OverlayPanel {
                     .leftColor(new Color(0x90EE90)) // light green
                     .build());
 
-            // Show top 3 items in looting bag
+            // Show top 5 items in looting bag with format: "5x Rune platelegs"
             script.getLootingBagContents().entrySet().stream()
                     .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue())) // Sort by quantity descending
-                    .limit(3)
+                    .limit(5)
                     .forEach(entry -> {
+                        String displayText = String.format("    %,dx %s", entry.getValue(), entry.getKey());
                         panelComponent.getChildren().add(LineComponent.builder()
-                                .left("    " + entry.getKey())
-                                .right(String.format("%,d", entry.getValue()))
+                                .left(displayText)
                                 .leftColor(Color.LIGHT_GRAY)
-                                .rightColor(Color.WHITE)
                                 .build());
                     });
         }

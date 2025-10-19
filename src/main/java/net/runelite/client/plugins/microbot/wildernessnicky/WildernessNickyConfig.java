@@ -46,7 +46,9 @@ public interface WildernessNickyConfig extends Config {
     @ConfigItem(
         keyName = "startAtCourse",
         name = "Start at Course?",
-        description = "Skip banking and walk directly to course. Use if already paid entrance fee or just farming tickets.",
+        description = "<html>Skip banking and walk directly to course.<br>" +
+                      "<b>⚠️ IMPORTANT:</b> Only enable if you ALREADY PAID the 150k entrance fee!<br>" +
+                      "If not paid, bot will detect 0 value loot and auto-go to bank.</html>",
         position = 1,
         section = coreSection
     )

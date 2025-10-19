@@ -359,8 +359,12 @@ public final class WildernessNickyScript extends Script {
                 currentState = ObstacleState.STARTUP_INVENTORY_CHECK;
                 Microbot.log("[WildernessNicky] Starting with inventory check...");
             } else {
+                // Starting at course - assume entrance fee already paid
                 currentState = ObstacleState.START;
+                entranceFeePaid = true; // Assume paid when starting at course
                 Microbot.log("[WildernessNicky] Starting at course (skipping inventory check)");
+                Microbot.log("[WildernessNicky] ⚠️ ASSUMING ENTRANCE FEE ALREADY PAID!");
+                Microbot.log("[WildernessNicky] ⚠️ If you get 0 value loot, fee wasn't paid and bot will auto-bank");
             }
         }
         startTime = System.currentTimeMillis();
@@ -447,6 +451,12 @@ public final class WildernessNickyScript extends Script {
                 // ===== SOLO MODE - INSTANT LOGOUT FOR ATTACKABLE PLAYERS OR COMBAT =====
                 // Only check if not already attempting logout to avoid resetting timer
                 if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
+                    // Skip if in safe zone (Mage Bank, banking areas, etc.)
+                    if (isInSafeZone()) {
+                        // Don't trigger logout in safe zones
+                        return;
+                    }
+
                     // Check for ANY attackable player threat (not just skulled)
                     boolean playerThreat = detectAttackablePlayer();
                     Actor interacting = Microbot.getClient().getLocalPlayer().getInteracting();
@@ -1344,6 +1354,12 @@ public final class WildernessNickyScript extends Script {
                 String formattedValue = NumberFormat.getIntegerInstance().format(dispenserValue);
                 info("Dispenser Value: " + formattedValue);
 
+                // Randomly sync looting bag contents for GUI display (every 3-7 laps)
+                if (shouldSyncLootingBag()) {
+                    Microbot.log("[WildernessNicky] 📦 Opening looting bag to sync contents for GUI...");
+                    openLootingBagForSync();
+                }
+
                 // Generate new random drop location for this lap (if in Random mode)
                 generateRandomDropLocation();
 
@@ -2231,6 +2247,39 @@ public final class WildernessNickyScript extends Script {
             Rs2Inventory.interact("Manta ray", "Eat");
         } else if (Rs2Inventory.contains("Karambwan")) {
             Rs2Inventory.interact("Karambwan", "Eat");
+        }
+    }
+
+    /**
+     * Checks if player is in a safe zone (banks, non-wilderness areas, etc.)
+     * Safe zones don't trigger solo mode logout
+     */
+    private boolean isInSafeZone() {
+        try {
+            WorldPoint playerLoc = Rs2Player.getWorldLocation();
+            if (playerLoc == null) return false;
+
+            // Check if NOT in wilderness (safest check)
+            if (!Rs2Pvp.isInWilderness()) {
+                return true; // Not in wilderness = safe zone
+            }
+
+            // Mage Bank safe zone (underground)
+            // Mage Bank coordinates: 2534, 4712, 0 (plane 0 = underground instance)
+            WorldArea mageBankArea = new WorldArea(2530, 4708, 10, 10, 0); // 10x10 area around bank
+            if (mageBankArea.contains(playerLoc)) {
+                return true; // Inside Mage Bank
+            }
+
+            // Banking state check (if we're banking, assume safe)
+            if (currentState == ObstacleState.BANKING) {
+                return true;
+            }
+
+            return false; // Not in safe zone
+        } catch (Exception e) {
+            Microbot.log("[WildernessNicky] Error checking safe zone: " + e.getMessage());
+            return false; // Assume unsafe on error (better safe than sorry)
         }
     }
 
@@ -3488,11 +3537,27 @@ public final class WildernessNickyScript extends Script {
     private void addLootingBagValue(int qty1, String item1, int qty2, String item2) {
         int itemId1 = wildyItems.nameToItemId(item1);
         int itemId2 = wildyItems.nameToItemId(item2);
-        
+
         int value1 = Microbot.getItemManager().getItemPrice(itemId1) * qty1;
         int value2 = Microbot.getItemManager().getItemPrice(itemId2) * qty2;
-        
-        lootingBagValue += value1 + value2;
+
+        int totalValue = value1 + value2;
+
+        // CRITICAL: Detect zero-value loot (entrance fee not paid!)
+        if (totalValue == 0 || (value1 == 0 && value2 == 0)) {
+            Microbot.log("[WildernessNicky] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
+            Microbot.log("[WildernessNicky] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
+            Microbot.log("[WildernessNicky] Resetting entrance fee flag and going to bank to pay...");
+
+            // Reset entrance fee flag
+            entranceFeePaid = false;
+
+            // Force banking to pay entrance fee
+            currentState = ObstacleState.BANKING;
+            return;
+        }
+
+        lootingBagValue += totalValue;
     }
     
     /**
@@ -3502,12 +3567,28 @@ public final class WildernessNickyScript extends Script {
         int itemId1 = wildyItems.nameToItemId(item1);
         int itemId2 = wildyItems.nameToItemId(item2);
         int itemId3 = wildyItems.nameToItemId(item3);
-        
+
         int value1 = Microbot.getItemManager().getItemPrice(itemId1) * qty1;
         int value2 = Microbot.getItemManager().getItemPrice(itemId2) * qty2;
         int value3 = Microbot.getItemManager().getItemPrice(itemId3) * qty3;
-        
-        lootingBagValue += value1 + value2 + value3;
+
+        int totalValue = value1 + value2 + value3;
+
+        // CRITICAL: Detect zero-value loot (entrance fee not paid!)
+        if (totalValue == 0 || (value1 == 0 && value2 == 0 && value3 == 0)) {
+            Microbot.log("[WildernessNicky] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
+            Microbot.log("[WildernessNicky] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
+            Microbot.log("[WildernessNicky] Resetting entrance fee flag and going to bank to pay...");
+
+            // Reset entrance fee flag
+            entranceFeePaid = false;
+
+            // Force banking to pay entrance fee
+            currentState = ObstacleState.BANKING;
+            return;
+        }
+
+        lootingBagValue += totalValue;
     }
 
     /**
@@ -3572,6 +3653,60 @@ public final class WildernessNickyScript extends Script {
             }
         } catch (Exception e) {
             Microbot.log("[WildernessNicky] Error tracking projectile: " + e.getMessage());
+        }
+    }
+
+    // Looting bag sync tracking
+    private int lastLootingBagSyncLap = 0;
+    private int nextLootingBagSyncInterval = 0;
+
+    /**
+     * Determines if we should sync looting bag this lap (randomized 3-7 laps)
+     */
+    private boolean shouldSyncLootingBag() {
+        // Initialize random interval on first check
+        if (nextLootingBagSyncInterval == 0) {
+            nextLootingBagSyncInterval = 3 + new java.util.Random().nextInt(5); // 3-7 laps
+        }
+
+        // Check if enough laps have passed
+        if (dispenserLoots - lastLootingBagSyncLap >= nextLootingBagSyncInterval) {
+            lastLootingBagSyncLap = dispenserLoots;
+            // Generate new random interval for next sync
+            nextLootingBagSyncInterval = 3 + new java.util.Random().nextInt(5); // 3-7 laps
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Opens looting bag to trigger container sync for GUI display
+     * Uses random intervals (3-7 laps) to avoid predictable patterns
+     */
+    private void openLootingBagForSync() {
+        try {
+            // Check if we have a looting bag
+            if (!Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) && !Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+                Microbot.log("[WildernessNicky] No looting bag found for sync");
+                return;
+            }
+
+            // Open looting bag to view contents (this triggers ItemContainerChanged event)
+            if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
+                Rs2Inventory.interact(LOOTING_BAG_CLOSED_ID, "Open");
+                sleep(600); // Wait 1 game tick for interface to open
+            } else if (Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+                Rs2Inventory.interact(LOOTING_BAG_OPEN_ID, "View");
+                sleep(600); // Wait 1 game tick for interface to open
+            }
+
+            // Close the interface after syncing (press ESC)
+            Rs2Keyboard.keyPress(java.awt.event.KeyEvent.VK_ESCAPE);
+            sleep(300);
+
+            Microbot.log("[WildernessNicky] ✅ Looting bag synced for GUI (next sync in " + nextLootingBagSyncInterval + " laps)");
+        } catch (Exception e) {
+            Microbot.log("[WildernessNicky] Error syncing looting bag: " + e.getMessage());
         }
     }
 
