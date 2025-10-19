@@ -1356,7 +1356,7 @@ public final class WildernessNickyScript extends Script {
 
                 // Randomly sync looting bag contents for GUI display (every 3-7 laps)
                 if (shouldSyncLootingBag()) {
-                    Microbot.log("[WildernessNicky] 📦 Opening looting bag to sync contents for GUI...");
+                    Microbot.log("[WildernessNicky] 📦 Checking looting bag to sync contents for GUI...");
                     openLootingBagForSync();
                 }
 
@@ -3248,11 +3248,27 @@ public final class WildernessNickyScript extends Script {
     }
 
     private void handleBanking() {
+        Microbot.log("[WildernessNicky] 🏦 handleBanking() - Attempting to open bank...");
+
         // Single-step banking logic
         if (!Rs2Bank.isOpen()) {
+            // Walk to bank first if not nearby
+            if (!Rs2Bank.walkToBank()) {
+                Microbot.log("[WildernessNicky] Walking to bank...");
+                sleep(1000);
+                return;
+            }
+
+            Microbot.log("[WildernessNicky] Near bank, attempting to open...");
             Rs2Bank.openBank();
             sleepUntil(Rs2Bank::isOpen, 20000);
-            if (!Rs2Bank.isOpen()) return;
+
+            if (!Rs2Bank.isOpen()) {
+                Microbot.log("[WildernessNicky] ⚠️ Failed to open bank, will retry...");
+                return;
+            }
+
+            Microbot.log("[WildernessNicky] ✅ Bank opened successfully!");
         }
 
         // Reset entrance fee flag when banking (starting new session)
@@ -3680,29 +3696,27 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
-     * Opens looting bag to trigger container sync for GUI display
+     * Checks looting bag to trigger container sync for GUI display
      * Uses random intervals (3-7 laps) to avoid predictable patterns
      */
     private void openLootingBagForSync() {
         try {
-            // Check if we have a looting bag
+            // Check if we have a looting bag (closed or open)
             if (!Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) && !Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
                 Microbot.log("[WildernessNicky] No looting bag found for sync");
                 return;
             }
 
-            // Open looting bag to view contents (this triggers ItemContainerChanged event)
-            if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
-                Rs2Inventory.interact(LOOTING_BAG_CLOSED_ID, "Open");
-                sleep(600); // Wait 1 game tick for interface to open
-            } else if (Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
-                Rs2Inventory.interact(LOOTING_BAG_OPEN_ID, "View");
-                sleep(600); // Wait 1 game tick for interface to open
+            // Use "Check" option on the looting bag (triggers container sync without opening interface)
+            // Item ID 22586 = Open looting bag
+            if (Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+                Rs2Inventory.interact(LOOTING_BAG_OPEN_ID, "Check");
+                sleep(600); // Wait 1 game tick for container data
+            } else if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
+                // If closed, just interact with it (will auto-check)
+                Rs2Inventory.interact(LOOTING_BAG_CLOSED_ID, "Check");
+                sleep(600);
             }
-
-            // Close the interface after syncing (press ESC)
-            Rs2Keyboard.keyPress(java.awt.event.KeyEvent.VK_ESCAPE);
-            sleep(300);
 
             Microbot.log("[WildernessNicky] ✅ Looting bag synced for GUI (next sync in " + nextLootingBagSyncInterval + " laps)");
         } catch (Exception e) {
