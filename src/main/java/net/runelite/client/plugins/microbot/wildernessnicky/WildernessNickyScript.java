@@ -23,6 +23,7 @@ import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
+import net.runelite.client.plugins.microbot.util.tile.Rs2Tile;
 import net.runelite.client.plugins.microbot.globval.WidgetIndices;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import static net.runelite.api.Skill.AGILITY;
@@ -48,7 +49,7 @@ import javax.swing.SwingUtilities;
  * Wilderness Agility Script for RuneLite
  */
 public final class WildernessNickyScript extends Script {
-    public static final String VERSION = "1.6.0";
+    public static final String VERSION = "2.0.0";
 
     // --- Constants ---
     private static final int ACTION_DELAY = 3000;
@@ -301,7 +302,7 @@ public final class WildernessNickyScript extends Script {
     // ===== SOLO MODE / LOGOUT PRIORITY =====
     private boolean attemptingLogout = false;
     private long logoutAttemptStartTime = 0;
-    private static final long MAX_LOGOUT_ATTEMPT_TIME = 10000; // Try to logout for 10 seconds before running
+    private static final long MAX_LOGOUT_ATTEMPT_TIME = 3000; // Try to logout for 3 seconds (5 game ticks) before running
 
     // ===== SOLO MODE WORLD HOP LOGIC =====
     private int soloModeWorldHopAttempts = 0;
@@ -440,20 +441,25 @@ public final class WildernessNickyScript extends Script {
                     }
                 }
 
-                // ===== SOLO MODE - INSTANT LOGOUT FOR SKULLED PLAYERS OR COMBAT =====
+                // ===== SOLO MODE - INSTANT LOGOUT FOR ATTACKABLE PLAYERS OR COMBAT =====
                 // Only check if not already attempting logout to avoid resetting timer
                 if (config.soloMode() && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
-                    // Check for skulled threat OR if we're already in combat (e.g., skeletons attacking)
-                    boolean skulledThreat = detectSkulledThreat();
-                    boolean inCombat = Microbot.getClient().getLocalPlayer().getInteracting() != null;
+                    // Check for ANY attackable player threat (not just skulled)
+                    boolean playerThreat = detectAttackablePlayer();
+                    Actor interacting = Microbot.getClient().getLocalPlayer().getInteracting();
+                    boolean inCombat = interacting != null;
 
-                    if (skulledThreat || inCombat) {
-                        // Set logout priority flags FIRST
+                    // Differentiate between skeleton/NPC combat vs PKer combat
+                    boolean isNpcCombat = inCombat && !(interacting instanceof net.runelite.api.Player);
+                    boolean isPkerCombat = inCombat && (interacting instanceof net.runelite.api.Player);
+
+                    if (playerThreat || isPkerCombat) {
+                        // REAL PKer THREAT - Instant logout attempt
                         attemptingLogout = true;
                         logoutAttemptStartTime = System.currentTimeMillis();
 
-                        String reason = skulledThreat ? "SKULLED PKer detected" : "In combat (likely skeleton/NPC)";
-                        Microbot.log("[WildernessNicky] 💀 " + reason + " - attempting instant logout!");
+                        String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
+                        Microbot.log("[WildernessNicky] ⚠️ " + reason + " - attempting instant logout!");
 
                         // Try to logout
                         Rs2Player.logout();
@@ -525,6 +531,12 @@ public final class WildernessNickyScript extends Script {
                             Microbot.log("[WildernessNicky] ❌ Logout failed (in combat) - triggering escape with logout priority");
                             triggerPhoenixEscape(reason + " - logout failed, will keep trying to logout while escaping");
                         }
+                    } else if (isNpcCombat) {
+                        // SKELETON/NPC COMBAT - Run to safe spot to logout
+                        Microbot.log("[WildernessNicky] 🦴 Skeleton/NPC combat - running to safe spot to logout!");
+                        attemptingLogout = true;
+                        logoutAttemptStartTime = System.currentTimeMillis();
+                        triggerPhoenixEscape("Skeleton/NPC combat - finding safe spot to logout");
                     }
                 }
 
@@ -2110,8 +2122,64 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
-     * SOLO MODE - Detect skulled attackable players nearby
-     * More strict than regular threat detection - only triggers on skulled players
+     * SOLO MODE - Detect ANY attackable player nearby (skulled or not)
+     * Triggers instant logout in solo mode
+     */
+    private boolean detectAttackablePlayer() {
+        try {
+            net.runelite.api.Player localPlayer = Microbot.getClient().getLocalPlayer();
+            if (localPlayer == null) return false;
+
+            WorldPoint playerLocation = localPlayer.getWorldLocation();
+            int localCombatLevel = localPlayer.getCombatLevel();
+            int wildernessLevel = getWildernessLevel(playerLocation);
+
+            // Get FC members (for mass safety)
+            net.runelite.api.clan.ClanChannel clanChannel = Microbot.getClient().getClanChannel();
+            java.util.Set<String> fcMembers = new java.util.HashSet<>();
+            if (clanChannel != null && config.joinFc()) {
+                clanChannel.getMembers().forEach(member -> {
+                    if (member != null && member.getName() != null) {
+                        fcMembers.add(member.getName().toLowerCase().trim());
+                    }
+                });
+            }
+
+            // Scan for ANY attackable player within range (excluding FC members)
+            return Microbot.getClient().getTopLevelWorldView().players().stream()
+                .filter(p -> p != null && p != localPlayer)
+                .filter(p -> {
+                    // Skip FC/clan members
+                    String playerName = p.getName();
+                    if (playerName != null && fcMembers.contains(playerName.toLowerCase().trim())) {
+                        return false;
+                    }
+                    return true;
+                })
+                .filter(p -> {
+                    WorldPoint pLoc = p.getWorldLocation();
+                    return pLoc != null && pLoc.distanceTo(playerLocation) <= THREAT_SCAN_RADIUS;
+                })
+                .anyMatch(p -> {
+                    // Check if in attack range
+                    int theirCombatLevel = p.getCombatLevel();
+                    int levelDiff = Math.abs(theirCombatLevel - localCombatLevel);
+                    boolean canAttack = levelDiff <= wildernessLevel;
+
+                    if (canAttack) {
+                        String skullStatus = p.getSkullIcon() != -1 ? "SKULLED" : "non-skulled";
+                        Microbot.log("[WildernessNicky] ⚠️ Attackable player detected: " + p.getName() + " (Level " + theirCombatLevel + ", " + skullStatus + ")");
+                    }
+                    return canAttack;
+                });
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * LEGACY - Detect skulled attackable players nearby
+     * Kept for backwards compatibility but no longer used
      */
     private boolean detectSkulledThreat() {
         try {
@@ -2157,6 +2225,113 @@ public final class WildernessNickyScript extends Script {
             Rs2Inventory.interact("Manta ray", "Eat");
         } else if (Rs2Inventory.contains("Karambwan")) {
             Rs2Inventory.interact("Karambwan", "Eat");
+        }
+    }
+
+    /**
+     * Finds the nearest safe spot (away from NPCs/players) for logging out
+     * Returns null if no safe spot found within range
+     */
+    private WorldPoint findNearestSafeSpot() {
+        try {
+            WorldPoint currentLoc = Rs2Player.getWorldLocation();
+            if (currentLoc == null) return null;
+
+            // Search in expanding radius (3, 5, 7 tiles) for a safe walkable tile
+            for (int radius = 3; radius <= 7; radius++) {
+                for (int dx = -radius; dx <= radius; dx++) {
+                    for (int dy = -radius; dy <= radius; dy++) {
+                        WorldPoint candidate = new WorldPoint(
+                            currentLoc.getX() + dx,
+                            currentLoc.getY() + dy,
+                            currentLoc.getPlane()
+                        );
+
+                        // Check if tile is walkable and safe from NPCs
+                        if (isSafeTile(candidate)) {
+                            return candidate;
+                        }
+                    }
+                }
+            }
+            return null; // No safe spot found
+        } catch (Exception e) {
+            Microbot.log("[WildernessNicky] Error finding safe spot: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Checks if a tile is safe (walkable and no NPCs/players within 2 tiles)
+     */
+    private boolean isSafeTile(WorldPoint tile) {
+        try {
+            // Check if tile is walkable
+            if (!Rs2Tile.isWalkable(tile)) {
+                return false;
+            }
+
+            // Check for nearby NPCs (skeletons, etc.)
+            long nearbyNpcs = Microbot.getClient().getTopLevelWorldView().npcs().stream()
+                .filter(npc -> npc != null && npc.getWorldLocation() != null)
+                .filter(npc -> npc.getWorldLocation().distanceTo(tile) <= 2)
+                .count();
+
+            if (nearbyNpcs > 0) {
+                return false; // Not safe, NPCs too close
+            }
+
+            // Check for nearby players (PKers)
+            long nearbyPlayers = Microbot.getClient().getTopLevelWorldView().players().stream()
+                .filter(p -> p != null && p != Microbot.getClient().getLocalPlayer())
+                .filter(p -> p.getWorldLocation() != null)
+                .filter(p -> p.getWorldLocation().distanceTo(tile) <= 5) // Farther distance for players
+                .count();
+
+            if (nearbyPlayers > 0) {
+                return false; // Not safe, players too close
+            }
+
+            return true; // Safe tile found
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Enables the best protection prayer based on current attacker
+     * Used during emergency escape to maximize survival
+     */
+    private void enableBestProtectionPrayer() {
+        try {
+            if (!Rs2Player.hasPrayerPoints()) {
+                return; // No prayer points
+            }
+
+            Actor interacting = Microbot.getClient().getLocalPlayer().getInteracting();
+
+            // If being attacked by a player, use projectile-based prayer (handled by main loop)
+            if (interacting instanceof net.runelite.api.Player) {
+                // Projectile prayer switching is more accurate for players
+                // Handled by main loop's handleProjectilePrayerSwitching()
+                return;
+            }
+
+            // If being attacked by NPC (skeleton), default to protect melee
+            if (interacting instanceof net.runelite.api.NPC) {
+                if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
+                    switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
+                }
+            }
+
+            // If no attacker but in wilderness, enable Protect Item (via quick prayer)
+            if (interacting == null && Rs2Pvp.isInWilderness()) {
+                if (!Rs2Prayer.isQuickPrayerEnabled()) {
+                    Rs2Prayer.toggleQuickPrayer(true);
+                }
+            }
+        } catch (Exception e) {
+            Microbot.log("[WildernessNicky] Error enabling protection prayer: " + e.getMessage());
         }
     }
 
@@ -2414,6 +2589,27 @@ public final class WildernessNickyScript extends Script {
         if (attemptingLogout) {
             long logoutAttemptTime = System.currentTimeMillis() - logoutAttemptStartTime;
 
+            // ENHANCED: Check if we're in combat (can't log)
+            boolean inCombat = Microbot.getClient().getLocalPlayer().getInteracting() != null;
+
+            if (inCombat) {
+                // If in NPC combat, try to find safe spot away from NPCs
+                WorldPoint safeSpot = findNearestSafeSpot();
+                if (safeSpot != null && !Rs2Player.getWorldLocation().equals(safeSpot)) {
+                    Microbot.log("[WildernessNicky] 🏃 Running to safe spot at " + safeSpot + " to logout...");
+                    Rs2Walker.walkTo(safeSpot, 0);
+
+                    // Eat and pray while moving
+                    if (Rs2Player.getHealthPercentage() < 60) {
+                        eatFood();
+                    }
+                    enableBestProtectionPrayer();
+
+                    sleep(600);
+                    return;
+                }
+            }
+
             // Try to logout every tick
             Rs2Player.logout();
             sleep(100); // Small delay to check if logout succeeded
@@ -2429,10 +2625,8 @@ public final class WildernessNickyScript extends Script {
                 eatFood();
             }
 
-            // Activate protection prayers if have prayer points
-            if (Rs2Player.hasPrayerPoints() && config.useProjectilePrayerSwitching()) {
-                // Prayers handled by main loop
-            }
+            // ENHANCED: Activate best protection prayer based on situation
+            enableBestProtectionPrayer();
 
             // If we've been trying to logout for MAX_LOGOUT_ATTEMPT_TIME, give up and proceed with physical escape
             if (logoutAttemptTime > MAX_LOGOUT_ATTEMPT_TIME) {

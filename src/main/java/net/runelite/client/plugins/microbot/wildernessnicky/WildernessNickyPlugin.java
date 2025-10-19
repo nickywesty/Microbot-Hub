@@ -17,18 +17,18 @@ import net.runelite.client.util.Text;
 import net.runelite.client.eventbus.Subscribe;
 
 @PluginDescriptor(
-    name = PluginConstants.CRANNY + "Wilderness Agility",
-    description = "Automated wilderness agility training with banking and ticket collection",
+    name = PluginConstants.CRANNY + "Nickywest Wilderness Agility",
+    description = "Advanced wilderness agility with smart escape, world hopping, real-time looting bag tracking, and auto-regear",
     version = WildernessNickyPlugin.version,
-    authors = { "Cranny" },
+    authors = { "Cranny", "Enhanced by User" },
     minClientVersion = "2.0.21",
-    tags = {"agility", "skilling", "solo", "mass", "MoneyMaking"},
+    tags = {"agility", "skilling", "solo", "mass", "MoneyMaking", "wilderness", "pvp"},
     iconUrl = "https://chsami.github.io/Microbot-Hub/WildernessNickyPlugin/assets/icon.png",
     cardUrl = "httpa://chsami.github.io/Microbot-Hub/WildernessNickyPlugin/assets/card.png"
 )
 public class WildernessNickyPlugin extends Plugin {
 
-    static final String version = "1.6.0";
+    static final String version = "2.0.0";
     @Inject
     private OverlayManager overlayManager;
     @Inject

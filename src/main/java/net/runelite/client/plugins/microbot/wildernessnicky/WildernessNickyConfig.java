@@ -9,103 +9,104 @@ import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("wildernessagility")
 @ConfigInformation(
-    "Wilderness Agility v1.6.0<br>" +
-    "• Mass & solo compatible<br>" +
-    "• New emergency escape with Phoenix necklace detection<br>" +
-    "• See Discord for setup guides<br>" +
-    "• Enable 'Start at Course' to skip banking if already paid<br>" +
-    "• Inventory for banking start: 150k coins + knife + loot bag<br>" +
-            "<br>" +
-            "• Shoutout Net for the updates<br>"
-
+    "<h3>🌊 Nickywest Wilderness Agility v2.0.0</h3>" +
+    "<b>🛡️ ADVANCED ANTI-PK FEATURES:</b><br>" +
+    "• Detects attackable players (skulled OR non-skulled)<br>" +
+    "• Safe spot detection - finds safe tiles to logout<br>" +
+    "• Skeleton vs PKer detection - different handling<br>" +
+    "• Auto-prayers during escape (1-tick projectile switching)<br>" +
+    "• Logout priority: tries 3s before running to bank<br>" +
+    "• Eats food automatically while escaping<br>" +
+    "• World hops 3x in solo mode to find empty course<br>" +
+    "<br>" +
+    "<b>💰 Other Features:</b><br>" +
+    "• Real-time Looting Bag Tracking (GUI shows contents)<br>" +
+    "• Auto-regear on death or missing coins<br>" +
+    "• Entrance fee validation & management<br>" +
+    "• Clan vs non-clan hit detection<br>" +
+    "<br>" +
+    "<b>Quick Start:</b><br>" +
+    "• Inventory: 150k coins, knife, looting bag, phoenix necklace<br>" +
+    "• Enable 'Start at Course' if already at wilderness agility<br>" +
+    "• Solo mode: Enable for world hopping safety<br>" +
+    "• Mass mode: Disable solo, set clan hit threshold higher<br>"
 )
 public interface WildernessNickyConfig extends Config {
 
-    String startSection = "startSection";
+    // === Core Settings ===
+    @ConfigSection(
+        name = "⚙️ Core Settings",
+        description = "Essential plugin configuration",
+        position = 0
+    )
+    String coreSection = "coreSection";
 
     @ConfigItem(
         keyName = "startAtCourse",
         name = "Start at Course?",
-        description = "Skips coin/dispenser setup. Use if already paid or just farming tickets.",
+        description = "Skip banking and walk directly to course. Use if already paid entrance fee or just farming tickets.",
         position = 1,
-        section = startSection
+        section = coreSection
     )
     default boolean startAtCourse() { return false; }
 
     // === Escape Settings ===
     @ConfigSection(
-        name = "Escape Settings",
-        description = "Emergency escape and safety options.",
+        name = "🛡️ Escape & Safety",
+        description = "PKer detection, escape triggers, and prayer switching",
         position = 10
     )
     String escapeSection = "escapeSection";
 
     @ConfigItem(
-        keyName = "phoenixEscape",
-        name = "Phoenix Escape",
-        description = "Robust emergency escape: equips Phoenix necklace, climbs rocks, opens gates, and escapes to Mage Bank when necklace is missing.",
+        keyName = "soloMode",
+        name = "🌍 Solo Mode (World Hopping)",
+        description = "<html><b>ADVANCED v2.0:</b> Maximum anti-PK protection!<br>" +
+                      "• Detects ANY attackable player (skulled or not)<br>" +
+                      "• Skeleton combat: Finds safe spot to logout<br>" +
+                      "• PKer detected: Instant logout attempt<br>" +
+                      "• If in combat: Runs to safe spot, eats, prays<br>" +
+                      "• World hops 3x to find empty course<br>" +
+                      "• Stops plugin if no empty world found</html>",
         position = 11,
+        section = escapeSection
+    )
+    default boolean soloMode() { return false; }
+
+    @ConfigItem(
+        keyName = "phoenixEscape",
+        name = "Phoenix Necklace Escape",
+        description = "Emergency escape to Mage Bank: equips phoenix necklace, climbs rocks, opens gates when necklace is missing.",
+        position = 12,
         section = escapeSection
     )
     default boolean phoenixEscape() { return false; }
 
     @ConfigItem(
         keyName = "leaveAtHealthPercent",
-        name = "Leave at Health %",
-        description = "Emergency escape when health drops below this percentage. Uses same robust escape as Phoenix Escape. 0 = disabled.",
-        position = 12,
+        name = "Escape at Health %",
+        description = "Trigger emergency escape when health drops below this %. 0 = disabled.",
+        position = 13,
         section = escapeSection
     )
     @Range(min = 0, max = 100)
     default int leaveAtHealthPercent() { return 0; }
 
     @ConfigItem(
-        keyName = "enableProactivePlayerDetection",
-        name = "Proactive Player Detection",
-        description = "Scan for nearby PKers every 5 seconds. Triggers escape BEFORE being attacked if threatening player detected within 15 tiles.",
-        position = 13,
-        section = escapeSection
-    )
-    default boolean enableProactivePlayerDetection() { return true; }
-
-    @ConfigItem(
         keyName = "waitForHitBeforeEscape",
-        name = "Wait for Hit Before Escape",
-        description = "MASS-FRIENDLY: Only escape after taking PvP damage (being hit by a player). Ignores agility fail damage. Works well for mass agility runs.",
+        name = "⚔️ Wait for Hit (Mass Mode)",
+        description = "<html><b>MASS-FRIENDLY:</b> Only escape after taking PvP damage from a player.<br>" +
+                      "Ignores agility fail damage. Perfect for mass agility runs.</html>",
         position = 14,
         section = escapeSection
     )
     default boolean waitForHitBeforeEscape() { return false; }
 
     @ConfigItem(
-        keyName = "useProjectilePrayerSwitching",
-        name = "Projectile-Based Prayer Switching",
-        description = "<html>ADVANCED: Use projectile detection for 1-tick accurate prayer switching.<br>" +
-                      "MORE ACCURATE than weapon-based switching (detects actual attacks, not just equipped weapons).<br>" +
-                      "Automatically switches to the correct protection prayer based on incoming attack projectiles.<br>" +
-                      "Supports ALL magic, ranged, and melee projectiles in wilderness.<br>" +
-                      "Disable for weapon-based switching (legacy mode).</html>",
-        position = 15,
-        section = escapeSection
-    )
-    default boolean useProjectilePrayerSwitching() { return true; }
-
-    @ConfigItem(
-        keyName = "soloMode",
-        name = "Solo Mode (Instant Logout)",
-        description = "<html>SOLO RUNNING: Instantly attempt logout when SKULLED attackable player detected nearby.<br>" +
-                      "If logout fails (combat), will run to safe area while eating/praying and keep trying to logout.<br>" +
-                      "Disable for mass running.</html>",
-        position = 16,
-        section = escapeSection
-    )
-    default boolean soloMode() { return false; }
-
-    @ConfigItem(
         keyName = "clanMemberHitThreshold",
-        name = "Clan Member Hit Threshold",
-        description = "Number of hits from FC/clan members before escaping. Higher = more lenient for friendly mass.",
-        position = 17,
+        name = "Clan Hit Threshold",
+        description = "Hits from FC/clan members before escaping (higher = more lenient for mass)",
+        position = 15,
         section = escapeSection
     )
     @Range(min = 2, max = 20)
@@ -114,25 +115,47 @@ public interface WildernessNickyConfig extends Config {
     @ConfigItem(
         keyName = "nonClanHitThreshold",
         name = "Non-Clan Hit Threshold",
-        description = "Number of hits from NON-clan players before escaping. Lower = safer from actual PKers.",
-        position = 18,
+        description = "Hits from NON-clan players before escaping (lower = safer from PKers)",
+        position = 16,
         section = escapeSection
     )
     @Range(min = 1, max = 10)
     default int nonClanHitThreshold() { return 2; }
 
+    @ConfigItem(
+        keyName = "enableProactivePlayerDetection",
+        name = "🔍 Proactive PKer Detection",
+        description = "Scan for PKers every 5 seconds. Escape BEFORE being attacked if threatening player within 15 tiles.",
+        position = 17,
+        section = escapeSection
+    )
+    default boolean enableProactivePlayerDetection() { return true; }
+
+    @ConfigItem(
+        keyName = "useProjectilePrayerSwitching",
+        name = "🎯 Projectile Prayer Switching",
+        description = "<html><b>1-tick accurate</b> prayer switching based on incoming projectiles.<br>" +
+                      "More accurate than weapon-based (detects actual attacks).<br>" +
+                      "Supports ALL wilderness magic, ranged, and melee projectiles.</html>",
+        position = 18,
+        section = escapeSection
+    )
+    default boolean useProjectilePrayerSwitching() { return true; }
+
     // === Looting Settings ===
     @ConfigSection(
-        name = "Looting Settings",
-        description = "Settings for loot thresholds, ticket usage, and food management.",
+        name = "💰 Looting & Banking",
+        description = "Real-time loot tracking, banking thresholds, and ticket management",
         position = 20
     )
     String lootingSection = "lootingSection";
 
     @ConfigItem(
         keyName = "leaveAtValue",
-        name = "Leave Course at Looting Bag Value",
-        description = "Trigger banking after reaching this looting bag value.",
+        name = "📦 Bank at Looting Bag Value",
+        description = "<html><b>NEW v2.0:</b> Real-time looting bag tracking!<br>" +
+                      "Triggers banking when looting bag reaches this value.<br>" +
+                      "GUI shows current value and top 3 items.</html>",
         position = 21,
         section = lootingSection
     )

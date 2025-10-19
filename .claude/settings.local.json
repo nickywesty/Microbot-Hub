@@ -8,7 +8,9 @@
       "Bash(./gradlew :compileWildernessnickyJava)",
       "Bash(bash gradlew :compileWildernessnickyJava)",
       "Bash(bash gradlew :compileJava)",
-      "Bash(find \"/mnt/c/Users/Elite/Desktop/Microbot Practice/Microbot-Hub/src/main/java/net/runelite/client/plugins/microbot\" -name \"*.java\" -type f -exec grep -l \"WorldHopper\\|getNextWorld\" {})"
+      "Bash(find \"/mnt/c/Users/Elite/Desktop/Microbot Practice/Microbot-Hub/src/main/java/net/runelite/client/plugins/microbot\" -name \"*.java\" -type f -exec grep -l \"WorldHopper\\|getNextWorld\" {})",
+      "Bash(./gradlew :compileJava)",
+      "Bash(java -version)"
     ],
     "deny": [],
     "ask": []

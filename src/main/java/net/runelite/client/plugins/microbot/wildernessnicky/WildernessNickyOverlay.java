@@ -69,7 +69,7 @@ public class WildernessNickyOverlay extends OverlayPanel {
         panelComponent.setPreferredSize(new Dimension(250, baseHeight + bankedLootHeight + projectileHeight + escapeReasonHeight + lootingBagHeight));
 
         panelComponent.getChildren().add(TitleComponent.builder()
-                .text("\uD83D\uDC2C Wilderness Agility v" + (script != null ? script.VERSION : "1.6.0") + " \uD83D\uDC2C")
+                .text("\uD83C\uDF0A Nickywest Wilderness v" + (script != null ? script.VERSION : "2.0.0") + " \uD83C\uDF0A")
                 .color(new Color(0x00B4D8))
                 .build());
         panelComponent.getChildren().add(LineComponent.builder().build());
