@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.wildernessnicky;
+package net.runelite.client.plugins.microbot.wildernessagilitywithpk;
 
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
@@ -7,9 +7,9 @@ import net.runelite.client.config.Range;
 import net.runelite.client.config.ConfigInformation;
 import net.runelite.client.config.ConfigSection;
 
-@ConfigGroup("wildernessagility")
+@ConfigGroup("wildernessagilitywithpk")
 @ConfigInformation(
-    "<h3>🌊 Nickywest Wilderness Agility v2.0.0</h3>" +
+    "<h3>🌊 Wilderness Agility with PK v2.0.0</h3>" +
     "<b>🎮 Choose Your Play Mode:</b><br>" +
     "• <b>Proactive Only:</b> Scans for PKers, escapes before attack<br>" +
     "• <b>Solo Mode:</b> Instant logout + world hops (max safety)<br>" +
@@ -33,7 +33,7 @@ import net.runelite.client.config.ConfigSection;
     "• Set Play Mode to match your playstyle<br>" +
     "• Enable 'Start at Course' if already at wilderness agility<br>"
 )
-public interface WildernessNickyConfig extends Config {
+public interface WildernessAgilityWithPKConfig extends Config {
 
     // === Core Settings ===
     @ConfigSection(
@@ -300,10 +300,7 @@ public interface WildernessNickyConfig extends Config {
     @ConfigItem(
         keyName = "enablePlayerMonitor",
         name = "Enable Player Monitor?",
-        description = "<html><b>⚠️ WARNING:</b> Player Monitor can interfere with logout attempts!<br>" +
-                      "Only enable if you have the Player Monitor plugin installed.<br>" +
-                      "<b>Leave DISABLED for most users.</b><br><br>" +
-                      "Enables Player Monitor during banking/escape for extra PKer detection.</html>",
+        description = "Enable Player Monitor during banking and emergency escape for enhanced safety against PKers.",
         position = 31,
         section = bankingSection
     )

@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.microbot.wildernessnicky;
+package net.runelite.client.plugins.microbot.wildernessagilitywithpk;
 
 import java.text.NumberFormat;
 import java.util.*;
@@ -42,7 +42,7 @@ import net.runelite.api.Actor;
 import net.runelite.api.kit.KitType;
 import net.runelite.api.GraphicID;
 import net.runelite.api.Projectile;
-import net.runelite.client.plugins.microbot.wildernessnicky.enums.WildernessProjectileType;
+import net.runelite.client.plugins.microbot.wildernessagilitywithpk.enums.WildernessProjectileType;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -50,7 +50,7 @@ import javax.swing.SwingUtilities;
 /**
  * Wilderness Agility Script for RuneLite
  */
-public final class WildernessNickyScript extends Script {
+public final class WildernessAgilityWithPKScript extends Script {
     public static final String VERSION = "2.0.0";
 
     // --- Constants ---
@@ -81,17 +81,17 @@ public final class WildernessNickyScript extends Script {
     private static final WorldPoint DISPENSER_POINT = new WorldPoint(3004, 3936, 0);
 
     // --- Config & Plugin ---
-    private WildernessNickyConfig config;
+    private WildernessAgilityWithPKConfig config;
     @Inject
-    private WildernessNickyPlugin plugin;
+    private WildernessAgilityWithPKPlugin plugin;
 
     // --- Obstacle Models ---
-    private final List<WildernessNickyObstacleModel> obstacles = List.of(
-        new WildernessNickyObstacleModel(23137, false),
-        new WildernessNickyObstacleModel(23132, true),
-        new WildernessNickyObstacleModel(23556, false),
-        new WildernessNickyObstacleModel(23542, true),
-        new WildernessNickyObstacleModel(23640, false)
+    private final List<WildernessAgilityWithPKObstacleModel> obstacles = List.of(
+        new WildernessAgilityWithPKObstacleModel(23137, false),
+        new WildernessAgilityWithPKObstacleModel(23132, true),
+        new WildernessAgilityWithPKObstacleModel(23556, false),
+        new WildernessAgilityWithPKObstacleModel(23542, true),
+        new WildernessAgilityWithPKObstacleModel(23640, false)
     );
 
     // --- Dispenser Tracking ---
@@ -269,7 +269,7 @@ public final class WildernessNickyScript extends Script {
 
     // Looting bag value tracking
     private int lootingBagValue = 0;
-    private WildernessNickyItems wildyItems;
+    private WildernessAgilityWithPKItems wildyItems;
     private boolean waitingForLootingBagSync = false;
     private boolean hasCheckedLootingBagOnStartup = false; // Only check once per script run
     private static final int LOOTING_BAG_CONTAINER_ID = 516; // Container ID for looting bag interface
@@ -330,23 +330,23 @@ public final class WildernessNickyScript extends Script {
      * @param config The script configuration
      * @return true if started successfully
      */
-    public boolean run(WildernessNickyConfig config) {
+    public boolean run(WildernessAgilityWithPKConfig config) {
         this.config = config;
         forceStartAtCourse = false; // Always reset on run
 
         // Initialize wilderness agility items for looting bag value tracking
-        wildyItems = new WildernessNickyItems(Microbot.getItemManager());
+        wildyItems = new WildernessAgilityWithPKItems(Microbot.getItemManager());
 
         // Initialize startup grace period timer
         scriptStartTime = System.currentTimeMillis();
 
         // Log selected play mode
-        Microbot.log("[WildernessNicky] 🎮 Play Mode: " + config.playMode().toString());
+        Microbot.log("[WildernessAgilityWithPK] 🎮 Play Mode: " + config.playMode().toString());
 
         // ===== FC STARTUP CHECK =====
         // If FC is enabled but not in chat, auto-join
         if (config.joinFc() && !isInFriendChat()) {
-            Microbot.log("[WildernessNicky] 🔗 FC enabled but not in chat - auto-joining");
+            Microbot.log("[WildernessAgilityWithPK] 🔗 FC enabled but not in chat - auto-joining");
             sleep(1000); // Wait for client to fully initialize
             joinFriendChat();
         }
@@ -370,18 +370,18 @@ public final class WildernessNickyScript extends Script {
             // If NOT starting at course, do inventory check first
             if (!config.startAtCourse()) {
                 currentState = ObstacleState.STARTUP_INVENTORY_CHECK;
-                Microbot.log("[WildernessNicky] Starting with inventory check...");
+                Microbot.log("[WildernessAgilityWithPK] Starting with inventory check...");
             } else {
                 // Starting at course - assume entrance fee already paid
                 currentState = ObstacleState.START;
                 entranceFeePaid = true; // Assume paid when starting at course
-                Microbot.log("[WildernessNicky] Starting at course (skipping inventory check)");
-                Microbot.log("[WildernessNicky] ⚠️ ASSUMING ENTRANCE FEE ALREADY PAID!");
-                Microbot.log("[WildernessNicky] ⚠️ If you get 0 value loot, fee wasn't paid and bot will auto-bank");
+                Microbot.log("[WildernessAgilityWithPK] Starting at course (skipping inventory check)");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ ASSUMING ENTRANCE FEE ALREADY PAID!");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ If you get 0 value loot, fee wasn't paid and bot will auto-bank");
             }
         }
         startTime = System.currentTimeMillis();
-        Microbot.log("[WildernessNickyScript] startup called - grace period active for " + (STARTUP_GRACE_PERIOD/1000) + " seconds");
+        Microbot.log("[WildernessAgilityWithPKScript] startup called - grace period active for " + (STARTUP_GRACE_PERIOD/1000) + " seconds");
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
                 if (!Microbot.isLoggedIn()) return;
@@ -389,7 +389,7 @@ public final class WildernessNickyScript extends Script {
                 // Check for death via health percentage or chat message detection
                 if (Rs2Player.getHealthPercentage() <= 0 || deathDetected) {
                     if (deathDetected) {
-                        Microbot.log("[WildernessNicky] Death detected - triggering death handler");
+                        Microbot.log("[WildernessAgilityWithPK] Death detected - triggering death handler");
                     }
                     handlePlayerDeath();
                     deathDetected = false; // Reset flag
@@ -450,7 +450,7 @@ public final class WildernessNickyScript extends Script {
 
                 // ===== MASS MODE - WAIT FOR HIT THRESHOLDS =====
                 // Separate thresholds for clan members vs non-clan players
-                if (config.playMode() == WildernessNickyConfig.PlayMode.MASS && !emergencyEscapeTriggered && !gracePeriodActive) {
+                if (config.playMode() == WildernessAgilityWithPKConfig.PlayMode.MASS && !emergencyEscapeTriggered && !gracePeriodActive) {
                     // Check non-clan hits first (more dangerous)
                     if (nonClanHitCount >= config.nonClanHitThreshold()) {
                         triggerPhoenixEscape("Took " + nonClanHitCount + " hits from NON-CLAN player (" + lastAttackerName + ")");
@@ -463,7 +463,7 @@ public final class WildernessNickyScript extends Script {
 
                 // ===== SOLO MODE - INSTANT LOGOUT FOR ATTACKABLE PLAYERS OR COMBAT =====
                 // Only check if not already attempting logout to avoid resetting timer
-                if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
+                if (config.playMode() == WildernessAgilityWithPKConfig.PlayMode.SOLO && !emergencyEscapeTriggered && !gracePeriodActive && !attemptingLogout) {
                     // Skip solo mode checks if in safe zone (Mage Bank, banking areas, etc.)
                     if (!isInSafeZone()) {
                         // Only do player detection if NOT in safe zone
@@ -483,7 +483,7 @@ public final class WildernessNickyScript extends Script {
                         logoutAttemptStartTime = System.currentTimeMillis();
 
                         String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
-                        Microbot.log("[WildernessNicky] ⚠️ " + reason + " - attempting instant logout!");
+                        Microbot.log("[WildernessAgilityWithPK] ⚠️ " + reason + " - attempting instant logout!");
 
                         // Try to logout
                         Rs2Player.logout();
@@ -491,12 +491,12 @@ public final class WildernessNickyScript extends Script {
 
                         // Check if logout succeeded (player is no longer logged in)
                         if (!Microbot.isLoggedIn()) {
-                            Microbot.log("[WildernessNicky] ✅ Successfully logged out!");
+                            Microbot.log("[WildernessAgilityWithPK] ✅ Successfully logged out!");
 
                             // World hop to find empty course (up to 3 attempts)
                             if (soloModeWorldHopAttempts < MAX_SOLO_WORLD_HOP_ATTEMPTS) {
                                 soloModeWorldHopAttempts++;
-                                Microbot.log("[WildernessNicky] 🌍 Solo mode world hop attempt " + soloModeWorldHopAttempts + "/" + MAX_SOLO_WORLD_HOP_ATTEMPTS);
+                                Microbot.log("[WildernessAgilityWithPK] 🌍 Solo mode world hop attempt " + soloModeWorldHopAttempts + "/" + MAX_SOLO_WORLD_HOP_ATTEMPTS);
                                 sleep(2000); // Wait 2 seconds before world hop
 
                                 // Get current world before logout
@@ -513,7 +513,7 @@ public final class WildernessNickyScript extends Script {
                                 }
 
                                 if (nextWorld > 0 && nextWorld != currentWorld) {
-                                    Microbot.log("[WildernessNicky] Attempting to hop from world " + currentWorld + " to world " + nextWorld);
+                                    Microbot.log("[WildernessAgilityWithPK] Attempting to hop from world " + currentWorld + " to world " + nextWorld);
 
                                     // Reset cantHopWorld flag before attempting hop
                                     Microbot.cantHopWorld = false;
@@ -526,25 +526,25 @@ public final class WildernessNickyScript extends Script {
                                         boolean hopConfirmed = sleepUntil(() -> Rs2Player.getWorld() == targetWorld && Microbot.isLoggedIn(), 15000);
 
                                         if (hopConfirmed) {
-                                            Microbot.log("[WildernessNicky] ✅ Successfully hopped to world " + nextWorld);
+                                            Microbot.log("[WildernessAgilityWithPK] ✅ Successfully hopped to world " + nextWorld);
                                             // Reset logout flags to allow detection again
                                             attemptingLogout = false;
                                             // Wait a bit before resuming to let world load
                                             sleep(2000, 3000);
                                             return;
                                         } else {
-                                            Microbot.log("[WildernessNicky] ⚠️ World hop not confirmed - may have failed");
+                                            Microbot.log("[WildernessAgilityWithPK] ⚠️ World hop not confirmed - may have failed");
                                         }
                                     } else {
-                                        Microbot.log("[WildernessNicky] ⚠️ Failed to initiate world hop");
+                                        Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to initiate world hop");
                                     }
                                 } else {
-                                    Microbot.log("[WildernessNicky] ⚠️ No valid next world found");
+                                    Microbot.log("[WildernessAgilityWithPK] ⚠️ No valid next world found");
                                 }
                             } else {
                                 // Max world hop attempts reached - kill plugin
-                                Microbot.log("[WildernessNicky] ❌ Max world hop attempts reached (" + MAX_SOLO_WORLD_HOP_ATTEMPTS + ")");
-                                Microbot.log("[WildernessNicky] No empty course found - stopping plugin");
+                                Microbot.log("[WildernessAgilityWithPK] ❌ Max world hop attempts reached (" + MAX_SOLO_WORLD_HOP_ATTEMPTS + ")");
+                                Microbot.log("[WildernessAgilityWithPK] No empty course found - stopping plugin");
                                 sleep(2000);
                                 Microbot.stopPlugin(plugin);
                             }
@@ -552,12 +552,12 @@ public final class WildernessNickyScript extends Script {
                         } else {
                             // Logout failed (in combat), trigger escape with logout priority
                             // IMPORTANT: attemptingLogout = true is already set, so escape handler will keep trying
-                            Microbot.log("[WildernessNicky] ❌ Logout failed (in combat) - triggering escape with logout priority");
+                            Microbot.log("[WildernessAgilityWithPK] ❌ Logout failed (in combat) - triggering escape with logout priority");
                             triggerPhoenixEscape(reason + " - logout failed, will keep trying to logout while escaping");
                         }
                     } else if (isNpcCombat) {
                         // SKELETON/NPC COMBAT - Run to safe spot to logout
-                        Microbot.log("[WildernessNicky] 🦴 Skeleton/NPC combat - running to safe spot to logout!");
+                        Microbot.log("[WildernessAgilityWithPK] 🦴 Skeleton/NPC combat - running to safe spot to logout!");
                         attemptingLogout = true;
                         logoutAttemptStartTime = System.currentTimeMillis();
                         triggerPhoenixEscape("Skeleton/NPC combat - finding safe spot to logout");
@@ -568,7 +568,7 @@ public final class WildernessNickyScript extends Script {
                 // PROACTIVE PLAYER DETECTION - Scan for PKers before they attack
                 // Only active in PROACTIVE_ONLY mode (disabled in MASS and SOLO modes)
                 if (config.enableProactivePlayerDetection() &&
-                    config.playMode() == WildernessNickyConfig.PlayMode.PROACTIVE_ONLY &&
+                    config.playMode() == WildernessAgilityWithPKConfig.PlayMode.PROACTIVE_ONLY &&
                     !emergencyEscapeTriggered) {
                     if (detectNearbyThreat()) {
                         triggerPhoenixEscape("Threatening player detected within 15 tiles (Proactive Detection)");
@@ -592,7 +592,7 @@ public final class WildernessNickyScript extends Script {
                             triggerPhoenixEscape("Low HP (" + (int)Rs2Player.getHealthPercentage() + "%) + no food available");
                         } else {
                             // Just agility damage + have food - heal and continue
-                            Microbot.log("[WildernessNicky] Low HP from agility fail - eating food and continuing");
+                            Microbot.log("[WildernessAgilityWithPK] Low HP from agility fail - eating food and continuing");
                             eatFood();
                             sleep(1000, 1500); // Wait for food
                         }
@@ -614,22 +614,17 @@ public final class WildernessNickyScript extends Script {
 
                 // Handle prayer switching (if in wilderness and has prayer)
                 if (Rs2Pvp.isInWilderness() && Rs2Player.hasPrayerPoints()) {
+                    // Check if we should use projectile-based or weapon-based switching
                     long currentTime = System.currentTimeMillis();
 
+                    // Projectile-based switching (check every 50ms for maximum accuracy)
                     if (config.useProjectilePrayerSwitching()) {
-                        // PRIMARY: Projectile-based switching (check every 50ms for ranged/magic)
                         if (currentTime - lastProjectileCheckTime >= PROJECTILE_CHECK_INTERVAL) {
                             handleProjectilePrayerSwitching();
                             lastProjectileCheckTime = currentTime;
                         }
-
-                        // FALLBACK: Melee detection for attacks without projectiles
-                        // Only runs if no projectiles are being tracked
-                        if (incomingProjectiles.isEmpty()) {
-                            handleMeleeDetection();
-                        }
                     } else {
-                        // Legacy: weapon-based switching only (not recommended)
+                        // Fallback to weapon-based switching (legacy mode)
                         handle1TickPrayerSwitching();
                     }
                 }
@@ -793,7 +788,7 @@ public final class WildernessNickyScript extends Script {
         lastProjectileDetectionTime = 0;
         projectilesDetectedCount = 0;
         
-        Microbot.log("[WildernessNickyScript] shutdown called");
+        Microbot.log("[WildernessAgilityWithPKScript] shutdown called");
         super.shutdown();
     }
 
@@ -803,7 +798,7 @@ public final class WildernessNickyScript extends Script {
         System.out.println(msg);
     }
 
-    public boolean runeliteClientPluginsMicrobotWildernessagilityWildernessNickyScript_run(WildernessNickyConfig config) {
+    public boolean runeliteClientPluginsMicrobotWildernessagilityWildernessAgilityWithPKScript_run(WildernessAgilityWithPKConfig config) {
         return run(config);
     }
 
@@ -812,11 +807,11 @@ public final class WildernessNickyScript extends Script {
      * Handles player death with smart respawn detection and auto-return
      */
     private void handlePlayerDeath() {
-        Microbot.log("[WildernessNicky] ☠️ DEATH DETECTED - Initiating death recovery");
+        Microbot.log("[WildernessAgilityWithPK] ☠️ DEATH DETECTED - Initiating death recovery");
 
         // Option 1: User wants to logout after death
         if (!config.runBack() && config.logoutAfterDeath()) {
-            Microbot.log("[WildernessNicky] Config: Logout after death enabled - logging out");
+            Microbot.log("[WildernessAgilityWithPK] Config: Logout after death enabled - logging out");
             sleep(12000); // Wait for respawn
             attemptLogoutUntilLoggedOut();
             Microbot.stopPlugin(plugin);
@@ -825,14 +820,14 @@ public final class WildernessNickyScript extends Script {
 
         // Option 2: User wants to stop plugin after death
         if (!config.runBack() && !config.logoutAfterDeath()) {
-            Microbot.log("[WildernessNicky] Config: Run back disabled - stopping plugin");
+            Microbot.log("[WildernessAgilityWithPK] Config: Run back disabled - stopping plugin");
             sleep(12000);
             Microbot.stopPlugin(plugin);
             return;
         }
 
         // Option 3: AUTO DEATH WALKING - Run back and resume
-        Microbot.log("[WildernessNicky] Config: Auto death walking enabled - preparing to run back");
+        Microbot.log("[WildernessAgilityWithPK] Config: Auto death walking enabled - preparing to run back");
 
         // Wait for respawn animation to complete
         sleep(12000, 15000);
@@ -841,7 +836,7 @@ public final class WildernessNickyScript extends Script {
         WorldPoint respawnLocation = Rs2Player.getWorldLocation();
         String respawnArea = detectRespawnArea(respawnLocation);
 
-        Microbot.log("[WildernessNicky] Respawned at: " + respawnArea + " (" + respawnLocation + ")");
+        Microbot.log("[WildernessAgilityWithPK] Respawned at: " + respawnArea + " (" + respawnLocation + ")");
 
         // Check if we have items to recover (shouldn't in wilderness, but check anyway)
         boolean hasItemsToRecover = !Rs2Inventory.isEmpty();
@@ -850,7 +845,7 @@ public final class WildernessNickyScript extends Script {
         needsToBuyLootingBag = true;
 
         // Go to GE first to buy looting bag, then bank
-        Microbot.log("[WildernessNicky] Going to GE to buy new looting bag after death");
+        Microbot.log("[WildernessAgilityWithPK] Going to GE to buy new looting bag after death");
         currentState = ObstacleState.GE_BUY_LOOTING_BAG;
 
         // Reset emergency flags since we died
@@ -938,7 +933,7 @@ public final class WildernessNickyScript extends Script {
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
-    public void setPlugin(WildernessNickyPlugin plugin) {
+    public void setPlugin(WildernessAgilityWithPKPlugin plugin) {
         this.plugin = plugin;
     }
 
@@ -1279,7 +1274,7 @@ public final class WildernessNickyScript extends Script {
                     // Fallback: use XP detection if coordinate monitoring fails
                     int startExp = Microbot.getClient().getSkillExperience(AGILITY);
                     if (waitForXpChange(startExp, 3000)) { // Shorter timeout for fallback
-                        Microbot.log("[WildernessNicky] XP fallback successful, transitioning to dispenser");
+                        Microbot.log("[WildernessAgilityWithPK] XP fallback successful, transitioning to dispenser");
                         TileObject freshDispenser = getDispenserObj();
                         cachedDispenserObj = freshDispenser;
                         lastObjectCheck = System.currentTimeMillis();
@@ -1291,7 +1286,7 @@ public final class WildernessNickyScript extends Script {
                             waitingForDispenserLoot = true;
                             
                             // Start monitoring rock climb pose animation
-                            Microbot.log("[WildernessNicky] Starting rock climb pose animation monitoring...");
+                            Microbot.log("[WildernessAgilityWithPK] Starting rock climb pose animation monitoring...");
                             waitingForRockClimbCompletion = true;
                             // Don't interact with dispenser yet - wait for pose animation 737 to finish
                         }
@@ -1314,7 +1309,7 @@ public final class WildernessNickyScript extends Script {
 
         // CHECK 1: If incomplete lap was detected, start a new lap immediately
         if (incompleteLapDetected) {
-            Microbot.log("[WildernessNicky] Incomplete lap - resetting to PIPE to complete full lap");
+            Microbot.log("[WildernessAgilityWithPK] Incomplete lap - resetting to PIPE to complete full lap");
             currentState = ObstacleState.PIPE;
             incompleteLapDetected = false;
             dispenserInteractAttempts = 0;
@@ -1325,19 +1320,19 @@ public final class WildernessNickyScript extends Script {
 
         // CHECK 2: If we've tried to interact too many times without success, do a new lap
         if (dispenserInteractAttempts >= MAX_DISPENSER_INTERACT_ATTEMPTS) {
-            Microbot.log("[WildernessNicky] ⚠️ Failed to loot dispenser after " + MAX_DISPENSER_INTERACT_ATTEMPTS + " attempts");
-            Microbot.log("[WildernessNicky] Starting fresh lap - likely incomplete lap OR entrance fee not paid");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to loot dispenser after " + MAX_DISPENSER_INTERACT_ATTEMPTS + " attempts");
+            Microbot.log("[WildernessAgilityWithPK] Starting fresh lap - likely incomplete lap OR entrance fee not paid");
 
             // Reset entrance fee flag - if we couldn't loot, we probably didn't pay
             if (entranceFeePaid) {
-                Microbot.log("[WildernessNicky] Resetting entrance fee flag - no loot received suggests fee wasn't actually paid");
+                Microbot.log("[WildernessAgilityWithPK] Resetting entrance fee flag - no loot received suggests fee wasn't actually paid");
                 entranceFeePaid = false;
 
                 // Check if we have enough coins to pay again
                 int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
                 if (coinCount < 150000) {
-                    Microbot.log("[WildernessNicky] ⚠️ Not enough coins to re-pay entrance fee (" + coinCount + " < 150000)");
-                    Microbot.log("[WildernessNicky] Going to Mage Bank to regear...");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Not enough coins to re-pay entrance fee (" + coinCount + " < 150000)");
+                    Microbot.log("[WildernessAgilityWithPK] Going to Mage Bank to regear...");
                     currentState = ObstacleState.BANKING;
                     dispenserInteractAttempts = 0;
                     waitingForDispenserLoot = false;
@@ -1377,7 +1372,7 @@ public final class WildernessNickyScript extends Script {
 
                 // Randomly sync looting bag contents for GUI display (every 3-7 laps)
                 if (shouldSyncLootingBag()) {
-                    Microbot.log("[WildernessNicky] 📦 Checking looting bag to sync contents for GUI...");
+                    Microbot.log("[WildernessAgilityWithPK] 📦 Checking looting bag to sync contents for GUI...");
                     openLootingBagForSync();
                 }
 
@@ -1410,7 +1405,7 @@ public final class WildernessNickyScript extends Script {
             waitingForDispenserLoot = true;
             dispenserLootAttempts = 1; // Only try once, now wait for loot
             dispenserInteractAttempts++; // Increment attempt counter
-            Microbot.log("[WildernessNicky] Dispenser interact attempt " + dispenserInteractAttempts + "/" + MAX_DISPENSER_INTERACT_ATTEMPTS);
+            Microbot.log("[WildernessAgilityWithPK] Dispenser interact attempt " + dispenserInteractAttempts + "/" + MAX_DISPENSER_INTERACT_ATTEMPTS);
         } else if (dispenserLootAttempts == 1) {
             // If for some reason we didn't get loot after a while, allow retry or fallback
             // (Optional: add a timeout here if needed)
@@ -1440,12 +1435,12 @@ public final class WildernessNickyScript extends Script {
                             .orElse(null);
                     if (playerMonitor != null) {
                         Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for banking safety");
                     } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing without it");
                     }
                 } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
+                    Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor: " + e.getMessage());
                 }
             }
             if (config.enableWorldHop()) {
@@ -1468,12 +1463,12 @@ public final class WildernessNickyScript extends Script {
                             .orElse(null);
                     if (playerMonitor != null) {
                         Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for banking safety");
                     } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing without it");
                     }
                 } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
+                    Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor: " + e.getMessage());
                 }
             }
             if (config.enableWorldHop()) {
@@ -1495,12 +1490,12 @@ public final class WildernessNickyScript extends Script {
                             .orElse(null);
                     if (playerMonitor != null) {
                         Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for banking safety");
                     } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
+                        Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing without it");
                     }
                 } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
+                    Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor: " + e.getMessage());
                 }
             }
             if (config.enableWorldHop()) {
@@ -1528,7 +1523,7 @@ public final class WildernessNickyScript extends Script {
      * If missing any, goes to bank to withdraw them
      */
     private void handleStartupInventoryCheck() {
-        Microbot.log("[WildernessNicky] 📋 Checking startup inventory...");
+        Microbot.log("[WildernessAgilityWithPK] 📋 Checking startup inventory...");
 
         boolean hasKnife = Rs2Inventory.hasItem("Knife");
         boolean hasLootingBag = Rs2Inventory.hasItem("Looting bag");
@@ -1536,20 +1531,20 @@ public final class WildernessNickyScript extends Script {
         boolean hasEnoughCoins = coinCount >= 150000;
         boolean hasPhoenix = Rs2Inventory.hasItem("Phoenix necklace") || Rs2Equipment.isWearing("Phoenix necklace");
 
-        Microbot.log("[WildernessNicky] Knife: " + (hasKnife ? "✅" : "❌"));
-        Microbot.log("[WildernessNicky] Looting Bag: " + (hasLootingBag ? "✅" : "❌"));
-        Microbot.log("[WildernessNicky] Coins: " + coinCount + " / 150000 " + (hasEnoughCoins ? "✅" : "❌"));
-        Microbot.log("[WildernessNicky] Phoenix Necklace: " + (hasPhoenix ? "✅" : "❌"));
+        Microbot.log("[WildernessAgilityWithPK] Knife: " + (hasKnife ? "✅" : "❌"));
+        Microbot.log("[WildernessAgilityWithPK] Looting Bag: " + (hasLootingBag ? "✅" : "❌"));
+        Microbot.log("[WildernessAgilityWithPK] Coins: " + coinCount + " / 150000 " + (hasEnoughCoins ? "✅" : "❌"));
+        Microbot.log("[WildernessAgilityWithPK] Phoenix Necklace: " + (hasPhoenix ? "✅" : "❌"));
 
         // If all items present, skip to START
         if (hasKnife && hasLootingBag && hasEnoughCoins && hasPhoenix) {
-            Microbot.log("[WildernessNicky] ✅ All required items present! Proceeding to course...");
+            Microbot.log("[WildernessAgilityWithPK] ✅ All required items present! Proceeding to course...");
             currentState = ObstacleState.START;
             return;
         }
 
         // Otherwise, go to bank
-        Microbot.log("[WildernessNicky] ⚠️ Missing required items - going to bank...");
+        Microbot.log("[WildernessAgilityWithPK] ⚠️ Missing required items - going to bank...");
         currentState = ObstacleState.STARTUP_BANKING;
     }
 
@@ -1561,40 +1556,40 @@ public final class WildernessNickyScript extends Script {
         // Walk to nearest bank if not there
         if (!Rs2Bank.isOpen()) {
             if (!Rs2Bank.walkToBank()) {
-                Microbot.log("[WildernessNicky] Walking to nearest bank...");
+                Microbot.log("[WildernessAgilityWithPK] Walking to nearest bank...");
                 sleep(1000);
                 return;
             }
 
             if (!Rs2Bank.openBank()) {
-                Microbot.log("[WildernessNicky] Opening bank...");
+                Microbot.log("[WildernessAgilityWithPK] Opening bank...");
                 sleep(600);
                 return;
             }
         }
 
         // Bank is open, withdraw items
-        Microbot.log("[WildernessNicky] 🏦 Bank open - withdrawing required items...");
+        Microbot.log("[WildernessAgilityWithPK] 🏦 Bank open - withdrawing required items...");
 
         // Withdraw knife (if missing)
         if (config.withdrawKnife() && !Rs2Inventory.hasItem("Knife")) {
             if (Rs2Bank.hasItem("Knife")) {
-                Microbot.log("[WildernessNicky] Withdrawing knife...");
+                Microbot.log("[WildernessAgilityWithPK] Withdrawing knife...");
                 Rs2Bank.withdrawOne("Knife");
                 sleepUntil(() -> Rs2Inventory.hasItem("Knife"), 2000);
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ No knife found in bank!");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ No knife found in bank!");
             }
         }
 
         // Withdraw looting bag (if missing)
         if (config.withdrawLootingBag() && !Rs2Inventory.hasItem("Looting bag")) {
             if (Rs2Bank.hasItem("Looting bag")) {
-                Microbot.log("[WildernessNicky] Withdrawing looting bag...");
+                Microbot.log("[WildernessAgilityWithPK] Withdrawing looting bag...");
                 Rs2Bank.withdrawOne("Looting bag");
                 sleepUntil(() -> Rs2Inventory.hasItem("Looting bag"), 2000);
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ No looting bag found in bank!");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ No looting bag found in bank!");
             }
         }
 
@@ -1604,11 +1599,11 @@ public final class WildernessNickyScript extends Script {
             if (currentCoins < 150000) {
                 int coinsNeeded = 150000 - currentCoins;
                 if (Rs2Bank.hasItem("Coins")) {
-                    Microbot.log("[WildernessNicky] Withdrawing " + coinsNeeded + " coins...");
+                    Microbot.log("[WildernessAgilityWithPK] Withdrawing " + coinsNeeded + " coins...");
                     Rs2Bank.withdrawX("Coins", coinsNeeded);
                     sleepUntil(() -> Rs2Inventory.itemQuantity(COINS_ID) >= 150000, 2000);
                 } else {
-                    Microbot.log("[WildernessNicky] ⚠️ Not enough coins in bank!");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Not enough coins in bank!");
                 }
             }
         }
@@ -1616,37 +1611,37 @@ public final class WildernessNickyScript extends Script {
         // Withdraw phoenix necklace (if missing and phoenixEscape enabled)
         if (config.phoenixEscape() && !Rs2Inventory.hasItem("Phoenix necklace") && !Rs2Equipment.isWearing("Phoenix necklace")) {
             if (Rs2Bank.hasItem("Phoenix necklace")) {
-                Microbot.log("[WildernessNicky] Withdrawing phoenix necklace...");
+                Microbot.log("[WildernessAgilityWithPK] Withdrawing phoenix necklace...");
                 Rs2Bank.withdrawOne("Phoenix necklace");
                 sleepUntil(() -> Rs2Inventory.hasItem("Phoenix necklace"), 2000);
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ No phoenix necklace found in bank!");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ No phoenix necklace found in bank!");
             }
         }
 
         // Withdraw ice plateau teleport (if enabled)
         if (config.useIcePlateauTp() && !Rs2Inventory.hasItem("Ice plateau teleport")) {
             if (Rs2Bank.hasItem("Ice plateau teleport")) {
-                Microbot.log("[WildernessNicky] Withdrawing ice plateau teleport...");
+                Microbot.log("[WildernessAgilityWithPK] Withdrawing ice plateau teleport...");
                 Rs2Bank.withdrawOne("Ice plateau teleport");
                 sleepUntil(() -> Rs2Inventory.hasItem("Ice plateau teleport"), 2000);
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ No ice plateau teleport found in bank!");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ No ice plateau teleport found in bank!");
             }
         }
 
         // Withdraw venom protection (if configured)
-        if (config.withdrawVenomProtection() != WildernessNickyConfig.VenomProtectionOption.None) {
+        if (config.withdrawVenomProtection() != WildernessAgilityWithPKConfig.VenomProtectionOption.None) {
             int venomItemId = config.withdrawVenomProtection().getItemId();
             String venomItemName = config.withdrawVenomProtection().toString();
 
             if (!Rs2Inventory.hasItem(venomItemId)) {
                 if (Rs2Bank.hasItem(venomItemId)) {
-                    Microbot.log("[WildernessNicky] Withdrawing " + venomItemName + "...");
+                    Microbot.log("[WildernessAgilityWithPK] Withdrawing " + venomItemName + "...");
                     Rs2Bank.withdrawOne(venomItemId);
                     sleepUntil(() -> Rs2Inventory.hasItem(venomItemId), 2000);
                 } else {
-                    Microbot.log("[WildernessNicky] ⚠️ No " + venomItemName + " found in bank!");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ No " + venomItemName + " found in bank!");
                 }
             }
         }
@@ -1656,22 +1651,22 @@ public final class WildernessNickyScript extends Script {
         sleep(600);
 
         // Now traverse to wilderness agility course
-        Microbot.log("[WildernessNicky] ✅ Items withdrawn! Traveling to wilderness agility course...");
+        Microbot.log("[WildernessAgilityWithPK] ✅ Items withdrawn! Traveling to wilderness agility course...");
 
         // Use ice plateau teleport if we have it
         if (Rs2Inventory.hasItem("Ice plateau teleport")) {
-            Microbot.log("[WildernessNicky] Using ice plateau teleport...");
+            Microbot.log("[WildernessAgilityWithPK] Using ice plateau teleport...");
             Rs2Inventory.interact("Ice plateau teleport", "Break");
             sleepUntil(() -> Rs2Player.getWorldLocation().distanceTo(new WorldPoint(2974, 3938, 0)) <= 20, 5000);
         } else {
             // Walk to course (fallback)
-            Microbot.log("[WildernessNicky] Walking to course...");
+            Microbot.log("[WildernessAgilityWithPK] Walking to course...");
             Rs2Walker.walkTo(DISPENSER_POINT, 10);
             sleepUntil(() -> Rs2Player.getWorldLocation().distanceTo(DISPENSER_POINT) <= 10, 10000);
         }
 
         // Transition to START state
-        Microbot.log("[WildernessNicky] 🎯 Arrived at course - starting script!");
+        Microbot.log("[WildernessAgilityWithPK] 🎯 Arrived at course - starting script!");
         currentState = ObstacleState.START;
     }
 
@@ -1695,7 +1690,7 @@ public final class WildernessNickyScript extends Script {
             }
             int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
             if (coinCount < 150000) {
-                Microbot.log("[WildernessNicky] Not enough coins to deposit into dispenser (" + coinCount + " < 150000) - going to bank");
+                Microbot.log("[WildernessAgilityWithPK] Not enough coins to deposit into dispenser (" + coinCount + " < 150000) - going to bank");
                 
                 // Enable Player Monitor when starting banking process if configured
                 if (config.enablePlayerMonitor()) {
@@ -1706,26 +1701,26 @@ public final class WildernessNickyScript extends Script {
                                 .orElse(null);
                         if (playerMonitor != null) {
                             Microbot.startPlugin(playerMonitor);
-                            Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
+                            Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for banking safety");
                         } else {
-                            Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
+                            Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing without it");
                         }
                     } catch (Exception e) {
-                        Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
+                        Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor: " + e.getMessage());
                     }
                 }
                 currentState = ObstacleState.BANKING;
                 return;
             }
             if (dispenserObj != null) {
-                Microbot.log("[WildernessNicky] Attempting to deposit " + coinCount + " coins into dispenser");
+                Microbot.log("[WildernessAgilityWithPK] Attempting to deposit " + coinCount + " coins into dispenser");
                 Rs2Inventory.use(COINS_ID);
                 sleep(400);
                 Rs2GameObject.interact(dispenserObj, "Use");
                 sleep(getActionDelay());
                 sleepUntil(() -> Rs2Inventory.itemQuantity(COINS_ID) < coinCount, getXpTimeout());
             } else {
-                Microbot.log("[WildernessNicky] Dispenser object not found!");
+                Microbot.log("[WildernessAgilityWithPK] Dispenser object not found!");
             }
             currentState = ObstacleState.PIPE;
             return;
@@ -2098,7 +2093,7 @@ public final class WildernessNickyScript extends Script {
                     lastThreatHadHighTierGear = hasHighTierGear(p);
                     String gearWarning = lastThreatHadHighTierGear ? " [HIGH-TIER GEAR]" : "";
 
-                    Microbot.log("[WildernessNicky] ⚠️ ATTACKABLE PLAYER DETECTED: '" + playerName +
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ ATTACKABLE PLAYER DETECTED: '" + playerName +
                                "' (Lvl " + p.getCombatLevel() + ") NOT in FC at distance " +
                                pLoc.distanceTo(playerLocation) + " tiles" + gearWarning + " - POTENTIAL PKER!");
                 }
@@ -2110,7 +2105,7 @@ public final class WildernessNickyScript extends Script {
             return unsafePlayers > 0;
 
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error in player threat detection: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error in player threat detection: " + e.getMessage());
             return false;
         }
     }
@@ -2211,7 +2206,7 @@ public final class WildernessNickyScript extends Script {
 
                     if (canAttack) {
                         String skullStatus = p.getSkullIcon() != -1 ? "SKULLED" : "non-skulled";
-                        Microbot.log("[WildernessNicky] ⚠️ Attackable player detected: " + p.getName() + " (Level " + theirCombatLevel + ", " + skullStatus + ")");
+                        Microbot.log("[WildernessAgilityWithPK] ⚠️ Attackable player detected: " + p.getName() + " (Level " + theirCombatLevel + ", " + skullStatus + ")");
                     }
                     return canAttack;
                 });
@@ -2248,7 +2243,7 @@ public final class WildernessNickyScript extends Script {
                     boolean canAttack = levelDiff <= wildernessLevel;
 
                     if (canAttack) {
-                        Microbot.log("[WildernessNicky] 💀 Skulled player detected: " + p.getName() + " (Level " + theirCombatLevel + ")");
+                        Microbot.log("[WildernessAgilityWithPK] 💀 Skulled player detected: " + p.getName() + " (Level " + theirCombatLevel + ")");
                     }
                     return canAttack;
                 });
@@ -2299,7 +2294,7 @@ public final class WildernessNickyScript extends Script {
 
             return false; // Not in safe zone
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error checking safe zone: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error checking safe zone: " + e.getMessage());
             return false; // Assume unsafe on error (better safe than sorry)
         }
     }
@@ -2332,7 +2327,7 @@ public final class WildernessNickyScript extends Script {
             }
             return null; // No safe spot found
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error finding safe spot: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error finding safe spot: " + e.getMessage());
             return null;
         }
     }
@@ -2407,7 +2402,7 @@ public final class WildernessNickyScript extends Script {
                 }
             }
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error enabling protection prayer: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error enabling protection prayer: " + e.getMessage());
         }
     }
 
@@ -2436,7 +2431,7 @@ public final class WildernessNickyScript extends Script {
                 }
 
                 // Check if this is a wilderness agility loot item
-                if (WildernessNickyItems.ITEM_IDS.contains(itemId)) {
+                if (WildernessAgilityWithPKItems.ITEM_IDS.contains(itemId)) {
                     int quantity = itemModel.getQuantity();
 
                     // Add to banked loot HashMap
@@ -2446,13 +2441,13 @@ public final class WildernessNickyScript extends Script {
                     int itemValue = Microbot.getItemManager().getItemPrice(itemId) * quantity;
                     totalBankedValue += itemValue;
 
-                    Microbot.log("[WildernessNicky] Tracked: " + quantity + "x " + itemName + " (+" + NumberFormat.getIntegerInstance().format(itemValue) + "gp)");
+                    Microbot.log("[WildernessAgilityWithPK] Tracked: " + quantity + "x " + itemName + " (+" + NumberFormat.getIntegerInstance().format(itemValue) + "gp)");
                 }
             });
 
-            Microbot.log("[WildernessNicky] Loot tracking complete. Total tracked items: " + bankedLoot.size() + " types");
+            Microbot.log("[WildernessAgilityWithPK] Loot tracking complete. Total tracked items: " + bankedLoot.size() + " types");
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error tracking banked loot: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error tracking banked loot: " + e.getMessage());
         }
     }
 
@@ -2531,15 +2526,15 @@ public final class WildernessNickyScript extends Script {
 
                     if (isAttackerClanMember) {
                         clanMemberHitCount++;
-                        Microbot.log("[WildernessNicky] ⚔️ Clan Member Hit #" + clanMemberHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
+                        Microbot.log("[WildernessAgilityWithPK] ⚔️ Clan Member Hit #" + clanMemberHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
                     } else {
                         nonClanHitCount++;
-                        Microbot.log("[WildernessNicky] ⚔️ NON-CLAN Hit #" + nonClanHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
+                        Microbot.log("[WildernessAgilityWithPK] ⚔️ NON-CLAN Hit #" + nonClanHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
                     }
                 } else {
                     // Unknown attacker, assume non-clan for safety
                     nonClanHitCount++;
-                    Microbot.log("[WildernessNicky] ⚔️ PvP Hit #" + pvpHitCount + " Detected! Health dropped " + healthDrop + "%");
+                    Microbot.log("[WildernessAgilityWithPK] ⚔️ PvP Hit #" + pvpHitCount + " Detected! Health dropped " + healthDrop + "%");
                 }
             }
         }
@@ -2551,7 +2546,7 @@ public final class WildernessNickyScript extends Script {
             clanMemberHitCount = 0;
             nonClanHitCount = 0;
             lastAttackerName = "";
-            Microbot.log("[WildernessNicky] PvP damage flag cleared (timeout) - all hit counters reset");
+            Microbot.log("[WildernessAgilityWithPK] PvP damage flag cleared (timeout) - all hit counters reset");
         }
 
         // Update previous health
@@ -2626,8 +2621,8 @@ public final class WildernessNickyScript extends Script {
         pvpHitCount = 0;
         recentlyTookPvPDamage = false;
 
-        Microbot.log("[WildernessNicky] ⚠️ EMERGENCY ESCAPE TRIGGERED ⚠️");
-        Microbot.log("[WildernessNicky] 📋 ESCAPE REASON: " + reason);
+        Microbot.log("[WildernessAgilityWithPK] ⚠️ EMERGENCY ESCAPE TRIGGERED ⚠️");
+        Microbot.log("[WildernessAgilityWithPK] 📋 ESCAPE REASON: " + reason);
         
         // Enable Player Monitor for safety
         if (config.enablePlayerMonitor()) {
@@ -2638,12 +2633,12 @@ public final class WildernessNickyScript extends Script {
                         .orElse(null);
                 if (playerMonitor != null) {
                     Microbot.startPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor enabled for Emergency Escape");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for Emergency Escape");
                 } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing escape without it");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing escape without it");
                 }
             } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to start Player Monitor for Emergency Escape: " + e.getMessage());
+                Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor for Emergency Escape: " + e.getMessage());
             }
         }
         
@@ -2717,12 +2712,12 @@ public final class WildernessNickyScript extends Script {
 
         // Check if logout succeeded
         if (!Microbot.isLoggedIn()) {
-            Microbot.log("[WildernessNicky] ✅ Successfully logged out during emergency escape!");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Successfully logged out during emergency escape!");
 
             // If in solo mode, world hop to find safer world
-            if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && soloModeWorldHopAttempts < MAX_SOLO_WORLD_HOP_ATTEMPTS) {
+            if (config.playMode() == WildernessAgilityWithPKConfig.PlayMode.SOLO && soloModeWorldHopAttempts < MAX_SOLO_WORLD_HOP_ATTEMPTS) {
                 soloModeWorldHopAttempts++;
-                Microbot.log("[WildernessNicky] 🌍 Solo mode world hop attempt " + soloModeWorldHopAttempts + "/" + MAX_SOLO_WORLD_HOP_ATTEMPTS);
+                Microbot.log("[WildernessAgilityWithPK] 🌍 Solo mode world hop attempt " + soloModeWorldHopAttempts + "/" + MAX_SOLO_WORLD_HOP_ATTEMPTS);
                 sleep(2000); // Wait 2 seconds before world hop
 
                 int currentWorld = Rs2Player.getWorld();
@@ -2736,7 +2731,7 @@ public final class WildernessNickyScript extends Script {
                 }
 
                 if (nextWorld > 0 && nextWorld != currentWorld) {
-                    Microbot.log("[WildernessNicky] Attempting to hop from world " + currentWorld + " to world " + nextWorld);
+                    Microbot.log("[WildernessAgilityWithPK] Attempting to hop from world " + currentWorld + " to world " + nextWorld);
                     Microbot.cantHopWorld = false;
 
                     boolean hopSuccess = Microbot.hopToWorld(nextWorld);
@@ -2745,22 +2740,22 @@ public final class WildernessNickyScript extends Script {
                         boolean hopConfirmed = sleepUntil(() -> Rs2Player.getWorld() == targetWorld && Microbot.isLoggedIn(), 15000);
 
                         if (hopConfirmed) {
-                            Microbot.log("[WildernessNicky] ✅ Successfully hopped to world " + nextWorld);
+                            Microbot.log("[WildernessAgilityWithPK] ✅ Successfully hopped to world " + nextWorld);
                             // Reset escape state and continue
                             resetEscapeMode();
                             currentState = ObstacleState.START;
                             return;
                         } else {
-                            Microbot.log("[WildernessNicky] ⚠️ World hop not confirmed");
+                            Microbot.log("[WildernessAgilityWithPK] ⚠️ World hop not confirmed");
                         }
                     }
                 } else {
-                    Microbot.log("[WildernessNicky] ⚠️ No valid world found for hopping");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ No valid world found for hopping");
                 }
 
                 // If max hops reached, stop plugin
                 if (soloModeWorldHopAttempts >= MAX_SOLO_WORLD_HOP_ATTEMPTS) {
-                    Microbot.log("[WildernessNicky] ❌ Max world hop attempts reached - stopping plugin");
+                    Microbot.log("[WildernessAgilityWithPK] ❌ Max world hop attempts reached - stopping plugin");
                     sleep(2000);
                     Microbot.stopPlugin(plugin);
                 }
@@ -2780,23 +2775,23 @@ public final class WildernessNickyScript extends Script {
 
             if (logoutAttemptTime < MAX_LOGOUT_ATTEMPT_TIME) {
                 // Still within logout attempt window - don't proceed to physical escape yet
-                Microbot.log("[WildernessNicky] 🔄 Logout attempt " + (logoutAttemptTime/1000) + "s / " + (MAX_LOGOUT_ATTEMPT_TIME/1000) + "s... (combat detected)");
+                Microbot.log("[WildernessAgilityWithPK] 🔄 Logout attempt " + (logoutAttemptTime/1000) + "s / " + (MAX_LOGOUT_ATTEMPT_TIME/1000) + "s... (combat detected)");
                 return; // Keep trying logout (already tried above)
             } else {
                 // Logout timeout reached - proceed with physical escape
-                Microbot.log("[WildernessNicky] ⏱️ Logout timeout - proceeding with physical escape to Mage Bank");
+                Microbot.log("[WildernessAgilityWithPK] ⏱️ Logout timeout - proceeding with physical escape to Mage Bank");
                 attemptingLogout = false;
                 // Fall through to physical escape steps below
             }
         } else {
             // Not in logout mode, proceed directly to physical escape
-            Microbot.log("[WildernessNicky] 🏃 Beginning physical escape to Mage Bank...");
+            Microbot.log("[WildernessAgilityWithPK] 🏃 Beginning physical escape to Mage Bank...");
         }
 
         // SAFETY CHECK: Allow escape mode to be cancelled if conditions are met
         // This prevents getting stuck in escape mode forever
         if (canExitEscapeMode()) {
-            Microbot.log("[WildernessNicky] ✅ Safe conditions detected - exiting escape mode and resuming normal operation");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Safe conditions detected - exiting escape mode and resuming normal operation");
             resetEscapeMode();
             currentState = ObstacleState.START; // Resume from start
             return;
@@ -2805,8 +2800,8 @@ public final class WildernessNickyScript extends Script {
         // Check for timeout
         if (timeSinceStart > EMERGENCY_ESCAPE_TIMEOUT) {
             String timeoutReason = "Emergency escape timeout after " + (EMERGENCY_ESCAPE_TIMEOUT/1000) + " seconds (Original reason: " + lastEscapeReason + ")";
-            Microbot.log("[WildernessNicky] ⏱️ " + timeoutReason);
-            Microbot.log("[WildernessNicky] 🚪 Logging out for safety");
+            Microbot.log("[WildernessAgilityWithPK] ⏱️ " + timeoutReason);
+            Microbot.log("[WildernessAgilityWithPK] 🚪 Logging out for safety");
             lastEscapeReason = timeoutReason;
             Rs2Player.logout();
             return;
@@ -2822,18 +2817,18 @@ public final class WildernessNickyScript extends Script {
 
             // Failsafe: Skip if too many attempts
             if (escapeEquipNecklaceAttempts > MAX_ESCAPE_STEP_ATTEMPTS) {
-                Microbot.log("[WildernessNicky] ⚠️ Failed to equip Phoenix necklace after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - skipping");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to equip Phoenix necklace after " + MAX_ESCAPE_STEP_ATTEMPTS + " attempts - skipping");
                 hasEquippedPhoenixNecklace = true;
             } else {
                 Rs2Inventory.wield("Phoenix necklace");
-                Microbot.log("[WildernessNicky] 🔗 Equipping Phoenix necklace while escaping (Attempt " + escapeEquipNecklaceAttempts + ")");
+                Microbot.log("[WildernessAgilityWithPK] 🔗 Equipping Phoenix necklace while escaping (Attempt " + escapeEquipNecklaceAttempts + ")");
             }
         }
 
         // Mark as equipped if wearing (check during every iteration)
         if (!hasEquippedPhoenixNecklace && Rs2Equipment.isWearing("Phoenix necklace")) {
             hasEquippedPhoenixNecklace = true;
-            Microbot.log("[WildernessNicky] ✅ Phoenix necklace equipped");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Phoenix necklace equipped");
         }
         
         // ========================================
@@ -2854,14 +2849,14 @@ public final class WildernessNickyScript extends Script {
             // Failsafe: Skip if timeout (player might be past this already)
             long stepElapsedTime = System.currentTimeMillis() - escapeStep2StartTime;
             if (stepElapsedTime > ESCAPE_STEP_TIMEOUT * 2) { // 20 seconds timeout
-                Microbot.log("[WildernessNicky] ⚠️ Rock area navigation timeout - skipping to gate");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Rock area navigation timeout - skipping to gate");
                 hasClimbedRocks = true;
                 escapeStep2StartTime = 0;
             } else if (isInRockArea) {
                 // We're IN the rock area - climb rocks
                 if (!Rs2Player.isMoving() || escapeClimbRocksAttempts == 0) {
                     escapeClimbRocksAttempts++;
-                    Microbot.log("[WildernessNicky] 🧗 Climbing rocks (Attempt " + escapeClimbRocksAttempts + ")");
+                    Microbot.log("[WildernessAgilityWithPK] 🧗 Climbing rocks (Attempt " + escapeClimbRocksAttempts + ")");
                     Rs2GameObject.interact(ROCKS_OBJECT_ID, "Climb");
                 }
                 // Don't wait - keep looping to maintain logout spam and prayer switching
@@ -2869,7 +2864,7 @@ public final class WildernessNickyScript extends Script {
                 // Already past the rock area - mark as complete
                 hasClimbedRocks = true;
                 escapeStep2StartTime = 0;
-                Microbot.log("[WildernessNicky] ✅ Past rock area - continuing to gate");
+                Microbot.log("[WildernessAgilityWithPK] ✅ Past rock area - continuing to gate");
             } else {
                 // Not in rock area yet - keep walking toward gate
                 if (!Rs2Player.isMoving() || currentLoc.distanceTo(GATE_AREA) > 10) {
@@ -2892,18 +2887,18 @@ public final class WildernessNickyScript extends Script {
                 TileObject gate = Rs2GameObject.getGameObject(GATE_OBJECT_ID);
                 if (gate != null && escapeOpenGateAttempts < MAX_ESCAPE_STEP_ATTEMPTS) {
                     escapeOpenGateAttempts++;
-                    Microbot.log("[WildernessNicky] 🚪 Opening gate (Attempt " + escapeOpenGateAttempts + ")");
+                    Microbot.log("[WildernessAgilityWithPK] 🚪 Opening gate (Attempt " + escapeOpenGateAttempts + ")");
                     Rs2GameObject.interact(GATE_OBJECT_ID, "Open");
                 } else if (escapeOpenGateAttempts >= MAX_ESCAPE_STEP_ATTEMPTS) {
                     // Skip gate if too many attempts
                     hasOpenedGate = true;
-                    Microbot.log("[WildernessNicky] ⚠️ Gate opening skipped - continuing");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Gate opening skipped - continuing");
                 }
 
                 // Check if we're past the gate (it's open or we're through)
                 if (currentLoc.distanceTo(new WorldPoint(2534, 4712, 0)) < currentLoc.distanceTo(GATE_AREA)) {
                     hasOpenedGate = true;
-                    Microbot.log("[WildernessNicky] ✅ Past gate - heading to Mage Bank");
+                    Microbot.log("[WildernessAgilityWithPK] ✅ Past gate - heading to Mage Bank");
                 }
             }
         }
@@ -2922,9 +2917,9 @@ public final class WildernessNickyScript extends Script {
 
             // Check if we've reached Mage Bank safe zone
             if (distanceToBank <= 10) {
-                Microbot.log("[WildernessNicky] ✅ Reached Mage Bank safe zone!");
-                Microbot.log("[WildernessNicky] 📋 Escape reason: " + lastEscapeReason);
-                Microbot.log("[WildernessNicky] 🚪 Forcing logout...");
+                Microbot.log("[WildernessAgilityWithPK] ✅ Reached Mage Bank safe zone!");
+                Microbot.log("[WildernessAgilityWithPK] 📋 Escape reason: " + lastEscapeReason);
+                Microbot.log("[WildernessAgilityWithPK] 🚪 Forcing logout...");
 
                 // Force logout until successful
                 int logoutAttempts = 0;
@@ -2943,7 +2938,7 @@ public final class WildernessNickyScript extends Script {
             if (!Rs2Player.isMoving() || distanceToBank > 5) {
                 escapeWalkToMageBankAttempts++;
                 if (escapeWalkToMageBankAttempts % 5 == 1) { // Log every 5 attempts to reduce spam
-                    Microbot.log("[WildernessNicky] 🏃 Running to Mage Bank (Distance: " + distanceToBank + " tiles)");
+                    Microbot.log("[WildernessAgilityWithPK] 🏃 Running to Mage Bank (Distance: " + distanceToBank + " tiles)");
                 }
                 Rs2Walker.walkTo(mageBankPoint, 20);
             }
@@ -2951,7 +2946,7 @@ public final class WildernessNickyScript extends Script {
 
         // Failsafe: If we've been trying too long, force logout wherever we are
         if (escapeWalkToMageBankAttempts > MAX_ESCAPE_STEP_ATTEMPTS * 10) { // 50 attempts
-            Microbot.log("[WildernessNicky] ⚠️ Escape timeout - forcing logout at current location");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Escape timeout - forcing logout at current location");
             Rs2Player.logout();
             resetEscapeMode();
         }
@@ -3028,7 +3023,7 @@ public final class WildernessNickyScript extends Script {
 
         // Validate target world availability before attempting hop
         if (!isWorldAvailable(targetWorld)) {
-            Microbot.log("[WildernessNicky] ⚠️ World " + targetWorld + " not available - skipping hop in " + context);
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ World " + targetWorld + " not available - skipping hop in " + context);
             worldHopRetryCount = 0;
             return false;
         }
@@ -3041,7 +3036,7 @@ public final class WildernessNickyScript extends Script {
         // Check if we've exceeded max retries or timeout
         long timeSinceStart = System.currentTimeMillis() - worldHopRetryStartTime;
         if (worldHopRetryCount >= MAX_WORLD_HOP_RETRIES || timeSinceStart > WORLD_HOP_RETRY_TIMEOUT) {
-            Microbot.log("[WildernessNicky] ⚠️ World hop to " + targetWorld + " failed after " + worldHopRetryCount + " attempts in " + context);
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ World hop to " + targetWorld + " failed after " + worldHopRetryCount + " attempts in " + context);
             worldHopRetryCount = 0; // Reset for next attempt
             return false;
         }
@@ -3051,24 +3046,24 @@ public final class WildernessNickyScript extends Script {
         // Reset cantHopWorld flag before attempting hop
         Microbot.cantHopWorld = false;
 
-        Microbot.log("[WildernessNicky] 🌍 Hopping to world " + targetWorld + " (attempt " + worldHopRetryCount + "/" + MAX_WORLD_HOP_RETRIES + ") - " + context);
+        Microbot.log("[WildernessAgilityWithPK] 🌍 Hopping to world " + targetWorld + " (attempt " + worldHopRetryCount + "/" + MAX_WORLD_HOP_RETRIES + ") - " + context);
 
         // Attempt to initiate world hop
         boolean hopInitiated = Microbot.hopToWorld(targetWorld);
         if (!hopInitiated) {
-            Microbot.log("[WildernessNicky] ❌ Failed to initiate hop to " + targetWorld);
+            Microbot.log("[WildernessAgilityWithPK] ❌ Failed to initiate hop to " + targetWorld);
             return false; // Will retry on next call
         }
 
         // Wait for hop confirmation with faster 3s timeout (reduced from 8s)
         boolean hopConfirmed = sleepUntil(() -> Rs2Player.getWorld() == targetWorld, 3000);
         if (!hopConfirmed) {
-            Microbot.log("[WildernessNicky] ⏱️ Hop timeout - current world: " + Rs2Player.getWorld());
+            Microbot.log("[WildernessAgilityWithPK] ⏱️ Hop timeout - current world: " + Rs2Player.getWorld());
             return false; // Will retry on next call
         }
 
         // Success! Reset retry counter
-        Microbot.log("[WildernessNicky] ✅ Successfully hopped to world " + targetWorld);
+        Microbot.log("[WildernessAgilityWithPK] ✅ Successfully hopped to world " + targetWorld);
         worldHopRetryCount = 0;
         return true;
     }
@@ -3100,7 +3095,7 @@ public final class WildernessNickyScript extends Script {
             }
             return false; // World not found
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] ⚠️ Error checking world availability: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Error checking world availability: " + e.getMessage());
             return false; // Assume not available if error occurs
         }
     }
@@ -3121,13 +3116,13 @@ public final class WildernessNickyScript extends Script {
         bankWorld2 = getConfigWorld(config.bankWorld2());
     }
 
-    private int getConfigWorld(WildernessNickyConfig.BankWorldOption option) {
-        if (option == WildernessNickyConfig.BankWorldOption.Random) {
+    private int getConfigWorld(WildernessAgilityWithPKConfig.BankWorldOption option) {
+        if (option == WildernessAgilityWithPKConfig.BankWorldOption.Random) {
             // Pick a random world from the enum list, skipping the current world
-            List<WildernessNickyConfig.BankWorldOption> all = Arrays.asList(WildernessNickyConfig.BankWorldOption.values());
+            List<WildernessAgilityWithPKConfig.BankWorldOption> all = Arrays.asList(WildernessAgilityWithPKConfig.BankWorldOption.values());
             List<Integer> worldNums = new ArrayList<>();
-            for (WildernessNickyConfig.BankWorldOption o : all) {
-                if (o != WildernessNickyConfig.BankWorldOption.Random) {
+            for (WildernessAgilityWithPKConfig.BankWorldOption o : all) {
+                if (o != WildernessAgilityWithPKConfig.BankWorldOption.Random) {
                     int num = Integer.parseInt(o.name().substring(1));
                     if (num != Rs2Player.getWorld()) worldNums.add(num);
                 }
@@ -3181,12 +3176,12 @@ public final class WildernessNickyScript extends Script {
             // Check if already in a clan channel
             net.runelite.api.clan.ClanChannel clanChannel = Microbot.getClient().getClanChannel();
             if (clanChannel == null) {
-                Microbot.log("[WildernessNicky] Not in any clan channel");
+                Microbot.log("[WildernessAgilityWithPK] Not in any clan channel");
                 return;
             }
 
             String channelName = clanChannel.getName();
-            Microbot.log("[WildernessNicky] 🚪 Leaving clan channel: " + channelName);
+            Microbot.log("[WildernessAgilityWithPK] 🚪 Leaving clan channel: " + channelName);
 
             // PRIMARY: Widget-based leave
             Rs2Tab.switchTo(InterfaceTab.CHAT);
@@ -3198,7 +3193,7 @@ public final class WildernessNickyScript extends Script {
                 WidgetIndices.ChatChannel.JOIN_LABEL, false, 2000);
 
             if (!foundLeaveButton) {
-                Microbot.log("[WildernessNicky] ⚠️ Leave button not found - using direct keyboard entry");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Leave button not found - using direct keyboard entry");
                 // FALLBACK: Type "//" to leave channel
                 Rs2Keyboard.typeString("//");
                 sleep(300);
@@ -3214,12 +3209,12 @@ public final class WildernessNickyScript extends Script {
             // Verify left
             clanChannel = Microbot.getClient().getClanChannel();
             if (clanChannel == null) {
-                Microbot.log("[WildernessNicky] ✅ Successfully left clan channel");
+                Microbot.log("[WildernessAgilityWithPK] ✅ Successfully left clan channel");
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ May still be in clan channel");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ May still be in clan channel");
             }
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] ❌ Error leaving clan channel: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] ❌ Error leaving clan channel: " + e.getMessage());
         }
     }
 
@@ -3248,18 +3243,18 @@ public final class WildernessNickyScript extends Script {
     private void joinChatChannel(String channelName) {
         try {
             if (channelName == null || channelName.trim().isEmpty()) {
-                Microbot.log("[WildernessNicky] No clan channel name configured - skipping join");
+                Microbot.log("[WildernessAgilityWithPK] No clan channel name configured - skipping join");
                 return;
             }
 
             // Check if already in the target channel
             net.runelite.api.clan.ClanChannel clanChannel = Microbot.getClient().getClanChannel();
             if (clanChannel != null && clanChannel.getName().equalsIgnoreCase(channelName.trim())) {
-                Microbot.log("[WildernessNicky] Already in clan channel: " + channelName);
+                Microbot.log("[WildernessAgilityWithPK] Already in clan channel: " + channelName);
                 return;
             }
 
-            Microbot.log("[WildernessNicky] Joining clan channel: " + channelName);
+            Microbot.log("[WildernessAgilityWithPK] Joining clan channel: " + channelName);
 
             // Join via chat-channel using widget method
             Rs2Tab.switchTo(InterfaceTab.CHAT);
@@ -3271,7 +3266,7 @@ public final class WildernessNickyScript extends Script {
                 WidgetIndices.ChatChannel.JOIN_LABEL, false, 2000);
 
             if (!foundJoinButton) {
-                Microbot.log("[WildernessNicky] ⚠️ Join button not found - using direct keyboard entry");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Join button not found - using direct keyboard entry");
                 // FALLBACK: Type channel name directly (NOT "/join")
                 Rs2Keyboard.typeString(channelName);
                 sleep(300);
@@ -3293,12 +3288,12 @@ public final class WildernessNickyScript extends Script {
             // Verify we joined
             clanChannel = Microbot.getClient().getClanChannel();
             if (clanChannel != null && clanChannel.getName().equalsIgnoreCase(channelName.trim())) {
-                Microbot.log("[WildernessNicky] ✅ Successfully joined clan channel: " + channelName);
+                Microbot.log("[WildernessAgilityWithPK] ✅ Successfully joined clan channel: " + channelName);
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ May not have joined clan channel");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ May not have joined clan channel");
             }
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error joining clan channel: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error joining clan channel: " + e.getMessage());
         }
     }
 
@@ -3312,25 +3307,25 @@ public final class WildernessNickyScript extends Script {
                         .orElse(null);
                 if (playerMonitor != null) {
                     Microbot.startPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor enabled for banking safety");
                 } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - continuing without it");
                 }
             } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
+                Microbot.log("[WildernessAgilityWithPK] Failed to start Player Monitor: " + e.getMessage());
             }
         }
         
         // Initialize web walk timeout tracking
         if (webWalkStartTime == 0) {
             webWalkStartTime = System.currentTimeMillis();
-            Microbot.log("[WildernessNicky] Starting web walk to Mage Bank");
+            Microbot.log("[WildernessAgilityWithPK] Starting web walk to Mage Bank");
         }
         
         // Check for timeout
         long timeSinceStart = System.currentTimeMillis() - webWalkStartTime;
         if (timeSinceStart > WEB_WALK_TIMEOUT) {
-            Microbot.log("[WildernessNicky] Web walk to Mage Bank timed out after " + (WEB_WALK_TIMEOUT/1000) + " seconds, forcing to banking state");
+            Microbot.log("[WildernessAgilityWithPK] Web walk to Mage Bank timed out after " + (WEB_WALK_TIMEOUT/1000) + " seconds, forcing to banking state");
             webWalkStartTime = 0; // Reset for next attempt
             currentState = ObstacleState.BANKING;
             return;
@@ -3342,20 +3337,20 @@ public final class WildernessNickyScript extends Script {
         // Use web walking which will handle the lever interaction automatically
         boolean walkSuccess = Rs2Walker.walkTo(mageBankTile, 5); // Allow 5 tile distance for arrival
         if (walkSuccess) {
-            Microbot.log("[WildernessNicky] Successfully reached Mage Bank area");
+            Microbot.log("[WildernessAgilityWithPK] Successfully reached Mage Bank area");
             webWalkStartTime = 0; // Reset for next attempt
             currentState = ObstacleState.BANKING;
         } else {
             // Check if we're close enough to Mage Bank to consider it successful
             WorldPoint currentLoc = Rs2Player.getWorldLocation();
             if (currentLoc != null && currentLoc.distanceTo(mageBankTile) <= 10) {
-                Microbot.log("[WildernessNicky] Close enough to Mage Bank, proceeding to banking");
+                Microbot.log("[WildernessAgilityWithPK] Close enough to Mage Bank, proceeding to banking");
                 webWalkStartTime = 0; // Reset for next attempt
                 currentState = ObstacleState.BANKING;
             } else {
                 // Stay in this state to retry, but log progress
                 if (timeSinceStart % 10000 < 100) { // Log every 10 seconds
-                    Microbot.log("[WildernessNicky] Still walking to Mage Bank... (" + (timeSinceStart/1000) + "s elapsed)");
+                    Microbot.log("[WildernessAgilityWithPK] Still walking to Mage Bank... (" + (timeSinceStart/1000) + "s elapsed)");
                 }
             }
         }
@@ -3364,7 +3359,7 @@ public final class WildernessNickyScript extends Script {
     private void handleInteractLever() {
         // This method is no longer used since we're using web walking directly to Mage Bank
         // The web walker handles the lever interaction automatically
-        Microbot.log("[WildernessNicky] handleInteractLever called but using web walking instead");
+        Microbot.log("[WildernessAgilityWithPK] handleInteractLever called but using web walking instead");
         currentState = ObstacleState.BANKING;
     }
 
@@ -3373,11 +3368,11 @@ public final class WildernessNickyScript extends Script {
      * Flow: Walk to GE → Buy looting bag note → Use note on banker → Go to bank
      */
     private void handleGEBuyLootingBag() {
-        Microbot.log("[WildernessNicky] 🛒 Starting GE looting bag purchase");
+        Microbot.log("[WildernessAgilityWithPK] 🛒 Starting GE looting bag purchase");
 
         // Check if we already have a looting bag (shouldn't happen, but check)
         if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) || Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
-            Microbot.log("[WildernessNicky] ✅ Already have looting bag - skipping GE purchase");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Already have looting bag - skipping GE purchase");
             needsToBuyLootingBag = false;
             currentState = ObstacleState.BANKING;
             return;
@@ -3386,22 +3381,22 @@ public final class WildernessNickyScript extends Script {
         // Step 1: Walk to GE if not there
         if (!Rs2GrandExchange.isOpen()) {
             if (!isNearGrandExchange()) {
-                Microbot.log("[WildernessNicky] 🚶 Walking to Grand Exchange");
+                Microbot.log("[WildernessAgilityWithPK] 🚶 Walking to Grand Exchange");
                 Rs2GrandExchange.walkToGrandExchange();
                 if (!sleepUntil(this::isNearGrandExchange, 30000)) {
-                    Microbot.log("[WildernessNicky] ⚠️ Failed to reach Grand Exchange - will retry");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to reach Grand Exchange - will retry");
                     return; // Stay in this state to retry
                 }
             }
 
             // Step 2: Open GE
-            Microbot.log("[WildernessNicky] 🏦 Opening Grand Exchange");
+            Microbot.log("[WildernessAgilityWithPK] 🏦 Opening Grand Exchange");
             if (!Rs2GrandExchange.openExchange()) {
-                Microbot.log("[WildernessNicky] ⚠️ Failed to open Grand Exchange - will retry");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to open Grand Exchange - will retry");
                 return; // Stay in this state to retry
             }
             if (!sleepUntil(Rs2GrandExchange::isOpen, 5000)) {
-                Microbot.log("[WildernessNicky] ⚠️ Grand Exchange did not open - will retry");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Grand Exchange did not open - will retry");
                 return; // Stay in this state to retry
             }
         }
@@ -3412,32 +3407,32 @@ public final class WildernessNickyScript extends Script {
 
         if (basePrice <= 0) {
             basePrice = 10000; // Fallback price if API fails
-            Microbot.log("[WildernessNicky] ⚠️ Could not fetch price, using fallback: " + basePrice + " gp");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Could not fetch price, using fallback: " + basePrice + " gp");
         }
 
         // Increase price 3x (hit up arrow 3 times = +15% total)
         int buyPrice = (int)(basePrice * 1.15);
 
-        Microbot.log("[WildernessNicky] 💰 Buying looting bag for " + buyPrice + " gp (base: " + basePrice + " gp)");
+        Microbot.log("[WildernessAgilityWithPK] 💰 Buying looting bag for " + buyPrice + " gp (base: " + basePrice + " gp)");
 
         // Step 4: Buy 1x looting bag
         boolean buySuccess = Rs2GrandExchange.buyItem("Looting bag", buyPrice, 1);
         if (!buySuccess) {
-            Microbot.log("[WildernessNicky] ⚠️ Failed to place buy offer - will retry");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to place buy offer - will retry");
             Rs2GrandExchange.closeExchange();
             return; // Stay in this state to retry
         }
 
         // Step 5: Wait for purchase to complete (up to 10 seconds)
-        Microbot.log("[WildernessNicky] ⏳ Waiting for looting bag purchase to complete");
+        Microbot.log("[WildernessAgilityWithPK] ⏳ Waiting for looting bag purchase to complete");
         boolean bought = sleepUntil(Rs2GrandExchange::hasBoughtOffer, 10000);
 
         if (!bought) {
-            Microbot.log("[WildernessNicky] ⚠️ Purchase timeout - collecting anyway and will retry if needed");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Purchase timeout - collecting anyway and will retry if needed");
         }
 
         // Step 6: Collect to inventory
-        Microbot.log("[WildernessNicky] 📦 Collecting looting bag to inventory");
+        Microbot.log("[WildernessAgilityWithPK] 📦 Collecting looting bag to inventory");
         Rs2GrandExchange.collectAllToInventory();
         sleepUntil(() -> Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID), 3000);
 
@@ -3447,11 +3442,11 @@ public final class WildernessNickyScript extends Script {
 
         // Step 8: Verify we have the looting bag
         if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
-            Microbot.log("[WildernessNicky] ✅ Successfully purchased looting bag!");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Successfully purchased looting bag!");
             needsToBuyLootingBag = false;
             currentState = ObstacleState.BANKING;
         } else {
-            Microbot.log("[WildernessNicky] ⚠️ Looting bag not in inventory - will retry purchase");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Looting bag not in inventory - will retry purchase");
             // Stay in this state to retry
         }
     }
@@ -3497,7 +3492,7 @@ public final class WildernessNickyScript extends Script {
         if (dispenserObj != null && !entranceFeePaid) {
             int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
             if (coinCount >= 150000) {
-                Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Attempting to deposit 150k entrance fee into dispenser");
+                Microbot.log("[WildernessAgilityWithPK] [WALK_TO_COURSE] Attempting to deposit 150k entrance fee into dispenser");
                 Rs2Inventory.use(COINS_ID);
                 sleep(400);
                 Rs2GameObject.interact(dispenserObj, "Use");
@@ -3507,27 +3502,27 @@ public final class WildernessNickyScript extends Script {
                 boolean paymentSuccess = sleepUntil(() -> Rs2Inventory.itemQuantity(COINS_ID) < coinCount, getXpTimeout());
                 if (paymentSuccess) {
                     entranceFeePaid = true;
-                    Microbot.log("[WildernessNicky] ✅ Entrance fee paid successfully!");
+                    Microbot.log("[WildernessAgilityWithPK] ✅ Entrance fee paid successfully!");
                 } else {
-                    Microbot.log("[WildernessNicky] ⚠️ Entrance fee payment may have failed - will retry next time");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Entrance fee payment may have failed - will retry next time");
                 }
             } else {
                 // Not enough coins - need to go bank/regear
-                Microbot.log("[WildernessNicky] ⚠️ Not enough coins for entrance fee (" + coinCount + " < 150000)");
-                Microbot.log("[WildernessNicky] Going to Mage Bank to regear with starting setup...");
+                Microbot.log("[WildernessAgilityWithPK] ⚠️ Not enough coins for entrance fee (" + coinCount + " < 150000)");
+                Microbot.log("[WildernessAgilityWithPK] Going to Mage Bank to regear with starting setup...");
                 currentState = ObstacleState.BANKING;
                 return;
             }
         } else if (entranceFeePaid) {
-            Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Entrance fee already paid - skipping payment");
+            Microbot.log("[WildernessAgilityWithPK] [WALK_TO_COURSE] Entrance fee already paid - skipping payment");
         } else {
-            Microbot.log("[WildernessNicky] [WALK_TO_COURSE] Dispenser object not found!");
+            Microbot.log("[WildernessAgilityWithPK] [WALK_TO_COURSE] Dispenser object not found!");
         }
         currentState = ObstacleState.PIPE;
     }
 
     private void handleBanking() {
-        Microbot.log("[WildernessNicky] 🏦 handleBanking() - Attempting to open bank...");
+        Microbot.log("[WildernessAgilityWithPK] 🏦 handleBanking() - Attempting to open bank...");
 
         // Single-step banking logic
         if (!Rs2Bank.isOpen()) {
@@ -3540,42 +3535,42 @@ public final class WildernessNickyScript extends Script {
 
             if (inMageBank) {
                 // Mage Bank uses a bank chest, not a booth
-                Microbot.log("[WildernessNicky] In Mage Bank - attempting to open bank...");
+                Microbot.log("[WildernessAgilityWithPK] In Mage Bank - attempting to open bank...");
 
                 // Rs2Bank.openBank() should find any nearby bank object (chest, booth, etc.)
                 Rs2Bank.openBank();
                 sleepUntil(Rs2Bank::isOpen, 10000);
 
                 if (!Rs2Bank.isOpen()) {
-                    Microbot.log("[WildernessNicky] ⚠️ Failed to open Mage Bank chest, retrying...");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to open Mage Bank chest, retrying...");
                     return;
                 }
 
-                Microbot.log("[WildernessNicky] ✅ Mage Bank opened successfully!");
+                Microbot.log("[WildernessAgilityWithPK] ✅ Mage Bank opened successfully!");
             } else {
                 // Regular bank (use normal banking)
                 if (!Rs2Bank.walkToBank()) {
-                    Microbot.log("[WildernessNicky] Walking to bank...");
+                    Microbot.log("[WildernessAgilityWithPK] Walking to bank...");
                     sleep(1000);
                     return;
                 }
 
-                Microbot.log("[WildernessNicky] Near bank, attempting to open...");
+                Microbot.log("[WildernessAgilityWithPK] Near bank, attempting to open...");
                 Rs2Bank.openBank();
                 sleepUntil(Rs2Bank::isOpen, 20000);
 
                 if (!Rs2Bank.isOpen()) {
-                    Microbot.log("[WildernessNicky] ⚠️ Failed to open bank, will retry...");
+                    Microbot.log("[WildernessAgilityWithPK] ⚠️ Failed to open bank, will retry...");
                     return;
                 }
 
-                Microbot.log("[WildernessNicky] ✅ Bank opened successfully!");
+                Microbot.log("[WildernessAgilityWithPK] ✅ Bank opened successfully!");
             }
         }
 
         // Reset entrance fee flag when banking (starting new session)
         if (entranceFeePaid) {
-            Microbot.log("[WildernessNicky] Resetting entrance fee flag (banking indicates new session)");
+            Microbot.log("[WildernessAgilityWithPK] Resetting entrance fee flag (banking indicates new session)");
             entranceFeePaid = false;
         }
 
@@ -3588,12 +3583,12 @@ public final class WildernessNickyScript extends Script {
                         .orElse(null);
                 if (playerMonitor != null) {
                     Microbot.stopPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor disabled - safely reached bank");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor disabled - safely reached bank");
                 } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - nothing to disable");
+                    Microbot.log("[WildernessAgilityWithPK] Player Monitor plugin not found - nothing to disable");
                 }
             } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to stop Player Monitor: " + e.getMessage());
+                Microbot.log("[WildernessAgilityWithPK] Failed to stop Player Monitor: " + e.getMessage());
             }
         }
         
@@ -3603,14 +3598,14 @@ public final class WildernessNickyScript extends Script {
 
         // Check if we have an open looting bag and deposit its contents first
         if (Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
-            Microbot.log("[WildernessNicky] Depositing looting bag contents (value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + "gp)");
+            Microbot.log("[WildernessAgilityWithPK] Depositing looting bag contents (value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + "gp)");
             Rs2Bank.depositLootingBag();
             sleep(getActionDelay());
 
             // Reset looting bag value and contents after deposit
             lootingBagValue = 0;
             lootingBagContents.clear();
-            Microbot.log("[WildernessNicky] Looting bag value and contents reset after deposit");
+            Microbot.log("[WildernessAgilityWithPK] Looting bag value and contents reset after deposit");
         }
 
         // Deposit all
@@ -3619,7 +3614,7 @@ public final class WildernessNickyScript extends Script {
 
         // Increment banking trip counter
         totalBankingTrips++;
-        Microbot.log("[WildernessNicky] Banking trip #" + totalBankingTrips + " completed. Total banked value: " + NumberFormat.getIntegerInstance().format(totalBankedValue) + "gp");
+        Microbot.log("[WildernessAgilityWithPK] Banking trip #" + totalBankingTrips + " completed. Total banked value: " + NumberFormat.getIntegerInstance().format(totalBankedValue) + "gp");
 
         // Withdraw Looting Bag (if enabled) - ORDER 1
         if (config.withdrawLootingBag() && !Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) && !Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
@@ -3629,18 +3624,18 @@ public final class WildernessNickyScript extends Script {
             
             if (closedSuccess) {
                 needsLootingBagActivation = true; // Mark that we need to activate it after bank closes
-                Microbot.log("[WildernessNicky] Successfully withdrew closed looting bag");
+                Microbot.log("[WildernessAgilityWithPK] Successfully withdrew closed looting bag");
             } else {
                 // If closed bag withdrawal failed, try open bag
-                Microbot.log("[WildernessNicky] Closed looting bag not available, trying open version");
+                Microbot.log("[WildernessAgilityWithPK] Closed looting bag not available, trying open version");
                 Rs2Bank.withdrawOne(LOOTING_BAG_OPEN_ID);
                 boolean openSuccess = sleepUntil(() -> Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID), 3000);
                 
                 if (openSuccess) {
-                    Microbot.log("[WildernessNicky] Successfully withdrew open looting bag");
+                    Microbot.log("[WildernessAgilityWithPK] Successfully withdrew open looting bag");
                     needsLootingBagActivation = false; // No need to activate, already open
                 } else {
-                    Microbot.log("[WildernessNicky] Failed to withdraw looting bag in any state");
+                    Microbot.log("[WildernessAgilityWithPK] Failed to withdraw looting bag in any state");
                 }
             }
         }
@@ -3652,7 +3647,7 @@ public final class WildernessNickyScript extends Script {
         }
         
         // Withdraw Venom Protection (if enabled) - ORDER 3
-        if (config.withdrawVenomProtection() != WildernessNickyConfig.VenomProtectionOption.None) {
+        if (config.withdrawVenomProtection() != WildernessAgilityWithPKConfig.VenomProtectionOption.None) {
             int venomItemId = config.withdrawVenomProtection().getItemId();
             if (venomItemId != -1 && !Rs2Inventory.hasItem(venomItemId)) {
                 Rs2Bank.withdrawOne(venomItemId);
@@ -3668,7 +3663,7 @@ public final class WildernessNickyScript extends Script {
         
         // Withdraw Phoenix Necklace (if enabled) - ORDER 5
         if (config.phoenixEscape() && !Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID) && !Rs2Equipment.isWearing("Phoenix necklace")) {
-            Microbot.log("[WildernessNicky] Withdrawing Phoenix necklace...");
+            Microbot.log("[WildernessAgilityWithPK] Withdrawing Phoenix necklace...");
             Rs2Bank.withdrawOne(PHOENIX_NECKLACE_ID);
             sleepUntil(() -> Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID), 3000);
         }
@@ -3680,7 +3675,7 @@ public final class WildernessNickyScript extends Script {
         }
 
         // Confirm all items are present
-        boolean venomPresent = config.withdrawVenomProtection() == WildernessNickyConfig.VenomProtectionOption.None ||
+        boolean venomPresent = config.withdrawVenomProtection() == WildernessAgilityWithPKConfig.VenomProtectionOption.None ||
             (config.withdrawVenomProtection().getItemId() != -1 && Rs2Inventory.hasItem(config.withdrawVenomProtection().getItemId()));
 
         boolean phoenixPresent = !config.phoenixEscape() || Rs2Inventory.hasItem(PHOENIX_NECKLACE_ID) || Rs2Equipment.isWearing("Phoenix necklace");
@@ -3693,7 +3688,7 @@ public final class WildernessNickyScript extends Script {
             && phoenixPresent;
 
         if (!allPresent) {
-            Microbot.log("[WildernessNicky] ⚠️ Not all required items present:");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ Not all required items present:");
             if (config.withdrawKnife() && !Rs2Inventory.hasItem(KNIFE_ID)) {
                 Microbot.log("  ❌ Missing: Knife");
             }
@@ -3712,7 +3707,7 @@ public final class WildernessNickyScript extends Script {
             if (!phoenixPresent) {
                 Microbot.log("  ❌ Missing: Phoenix Necklace");
             }
-            Microbot.log("[WildernessNicky] Retrying item withdrawal...");
+            Microbot.log("[WildernessAgilityWithPK] Retrying item withdrawal...");
             return;
         }
 
@@ -3721,7 +3716,7 @@ public final class WildernessNickyScript extends Script {
 
         // Activate looting bag if needed (closed -> open)
         if (needsLootingBagActivation && Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
-            Microbot.log("[WildernessNicky] Activating looting bag");
+            Microbot.log("[WildernessAgilityWithPK] Activating looting bag");
             Rs2Inventory.interact(LOOTING_BAG_CLOSED_ID, "Open");
             sleep(getActionDelay());
             needsLootingBagActivation = false;
@@ -3749,7 +3744,7 @@ public final class WildernessNickyScript extends Script {
      * Determines if we should drop items after dispenser based on config
      */
     private boolean shouldDropAfterDispenserNow() {
-        WildernessNickyConfig.DropLocationOption dropLocation = config.dropLocation();
+        WildernessAgilityWithPKConfig.DropLocationOption dropLocation = config.dropLocation();
         
         switch (dropLocation) {
             case AfterDispenser:
@@ -3768,7 +3763,7 @@ public final class WildernessNickyScript extends Script {
      * Generates a new random choice for drop location (called at start of each lap)
      */
     private void generateRandomDropLocation() {
-        if (config.dropLocation() == WildernessNickyConfig.DropLocationOption.Random) {
+        if (config.dropLocation() == WildernessAgilityWithPKConfig.DropLocationOption.Random) {
             shouldDropAfterDispenser = new Random().nextBoolean();
         }
     }
@@ -3846,14 +3841,14 @@ public final class WildernessNickyScript extends Script {
     
     /**
      * Handles dispenser chat messages to track looting bag value and detect incomplete laps
-     * Called from WildernessNickyPlugin.onChatMessage()
+     * Called from WildernessAgilityWithPKPlugin.onChatMessage()
      */
     public void handleDispenserChatMessage(String message) {
         // Check for incomplete lap message first
         if (message.contains("You need to complete one full lap to receive a reward")) {
             incompleteLapDetected = true;
-            Microbot.log("[WildernessNicky] ⚠️ INCOMPLETE LAP DETECTED - Need to complete full lap before dispenser works");
-            Microbot.log("[WildernessNicky] Starting fresh lap from PIPE obstacle...");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ INCOMPLETE LAP DETECTED - Need to complete full lap before dispenser works");
+            Microbot.log("[WildernessAgilityWithPK] Starting fresh lap from PIPE obstacle...");
             return;
         }
 
@@ -3907,9 +3902,9 @@ public final class WildernessNickyScript extends Script {
 
         // CRITICAL: Detect zero-value loot (entrance fee not paid!)
         if (totalValue == 0 || (value1 == 0 && value2 == 0)) {
-            Microbot.log("[WildernessNicky] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
-            Microbot.log("[WildernessNicky] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
-            Microbot.log("[WildernessNicky] Resetting entrance fee flag and going to bank to pay...");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
+            Microbot.log("[WildernessAgilityWithPK] Resetting entrance fee flag and going to bank to pay...");
 
             // Reset entrance fee flag
             entranceFeePaid = false;
@@ -3922,7 +3917,7 @@ public final class WildernessNickyScript extends Script {
         // Update total value
         lootingBagValue += totalValue;
 
-        Microbot.log(String.format("[WildernessNicky] Looting bag: +%d %s, +%d %s (Total: %s gp)",
+        Microbot.log(String.format("[WildernessAgilityWithPK] Looting bag: +%d %s, +%d %s (Total: %s gp)",
             qty1, item1, qty2, item2, NumberFormat.getIntegerInstance().format(lootingBagValue)));
     }
     
@@ -3953,9 +3948,9 @@ public final class WildernessNickyScript extends Script {
 
         // CRITICAL: Detect zero-value loot (entrance fee not paid!)
         if (totalValue == 0 || (value1 == 0 && value2 == 0 && value3 == 0)) {
-            Microbot.log("[WildernessNicky] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
-            Microbot.log("[WildernessNicky] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
-            Microbot.log("[WildernessNicky] Resetting entrance fee flag and going to bank to pay...");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ ZERO VALUE DISPENSER LOOT DETECTED!");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ This means ENTRANCE FEE WAS NOT PAID!");
+            Microbot.log("[WildernessAgilityWithPK] Resetting entrance fee flag and going to bank to pay...");
 
             // Reset entrance fee flag
             entranceFeePaid = false;
@@ -3968,7 +3963,7 @@ public final class WildernessNickyScript extends Script {
         // Update total value
         lootingBagValue += totalValue;
 
-        Microbot.log(String.format("[WildernessNicky] Looting bag: +%d %s, +%d %s, +%d %s [BONUS] (Total: %s gp)",
+        Microbot.log(String.format("[WildernessAgilityWithPK] Looting bag: +%d %s, +%d %s, +%d %s [BONUS] (Total: %s gp)",
             qty1, item1, qty2, item2, qty3, item3, NumberFormat.getIntegerInstance().format(lootingBagValue)));
     }
 
@@ -3987,7 +3982,7 @@ public final class WildernessNickyScript extends Script {
         // Add to running tally
         lootingBagContents.merge(itemName, quantity, Integer::sum);
 
-        Microbot.log(String.format("[WildernessNicky] 📦 Looting bag now contains: %d x %s",
+        Microbot.log(String.format("[WildernessAgilityWithPK] 📦 Looting bag now contains: %d x %s",
             lootingBagContents.get(itemName), itemName));
     }
 
@@ -4015,7 +4010,7 @@ public final class WildernessNickyScript extends Script {
     
     /**
      * Handles ItemContainerChanged events to sync looting bag value
-     * Called from WildernessNickyPlugin
+     * Called from WildernessAgilityWithPKPlugin
      */
     public void handleItemContainerChanged(net.runelite.api.events.ItemContainerChanged event) {
         // ALWAYS track looting bag container changes in real-time
@@ -4026,7 +4021,7 @@ public final class WildernessNickyScript extends Script {
 
     /**
      * Tracks incoming projectiles for projectile-based prayer switching
-     * Called by WildernessNickyPlugin when a projectile is detected
+     * Called by WildernessAgilityWithPKPlugin when a projectile is detected
      * @param hitCycle The game cycle when the projectile will hit
      * @param projectile The projectile object
      */
@@ -4045,14 +4040,14 @@ public final class WildernessNickyScript extends Script {
             // Log projectile detection (only if config enabled for projectile switching)
             if (config != null && config.useProjectilePrayerSwitching()) {
                 String attackStyle = WildernessProjectileType.getAttackStyleName(projectile.getId());
-                Microbot.log(String.format("[WildernessNicky] 🎯 Projectile detected: ID=%d, Style=%s, Cycles until impact=%d",
+                Microbot.log(String.format("[WildernessAgilityWithPK] 🎯 Projectile detected: ID=%d, Style=%s, Cycles until impact=%d",
                     projectile.getId(),
                     attackStyle,
                     (hitCycle - Microbot.getClient().getGameCycle()) / 30
                 ));
             }
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error tracking projectile: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error tracking projectile: " + e.getMessage());
         }
     }
 
@@ -4087,7 +4082,7 @@ public final class WildernessNickyScript extends Script {
         try {
             // Check if we have a looting bag (closed or open)
             if (!Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) && !Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
-                Microbot.log("[WildernessNicky] No looting bag found for sync");
+                Microbot.log("[WildernessAgilityWithPK] No looting bag found for sync");
                 return;
             }
 
@@ -4102,9 +4097,9 @@ public final class WildernessNickyScript extends Script {
                 sleep(600);
             }
 
-            Microbot.log("[WildernessNicky] ✅ Looting bag synced for GUI (next sync in " + nextLootingBagSyncInterval + " laps)");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Looting bag synced for GUI (next sync in " + nextLootingBagSyncInterval + " laps)");
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error syncing looting bag: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error syncing looting bag: " + e.getMessage());
         }
     }
 
@@ -4114,7 +4109,7 @@ public final class WildernessNickyScript extends Script {
      */
     private void syncLootingBagFromContainer(net.runelite.api.ItemContainer container) {
         if (container == null) {
-            Microbot.log("[WildernessNicky] Looting bag is empty (container null)");
+            Microbot.log("[WildernessAgilityWithPK] Looting bag is empty (container null)");
             lootingBagValue = 0;
             lootingBagContents.clear();
             waitingForLootingBagSync = false;
@@ -4142,7 +4137,7 @@ public final class WildernessNickyScript extends Script {
         lootingBagValue = totalValue;
         waitingForLootingBagSync = false;
 
-        Microbot.log("[WildernessNicky] 📦 Looting bag updated: " +
+        Microbot.log("[WildernessAgilityWithPK] 📦 Looting bag updated: " +
             java.text.NumberFormat.getIntegerInstance().format(lootingBagValue) + "gp, " +
             lootingBagContents.size() + " item types");
     }
@@ -4162,7 +4157,7 @@ public final class WildernessNickyScript extends Script {
             return; // No open looting bag to check
         }
         
-        Microbot.log("[WildernessNicky] Checking looting bag for initial sync...");
+        Microbot.log("[WildernessAgilityWithPK] Checking looting bag for initial sync...");
         waitingForLootingBagSync = true;
         hasCheckedLootingBagOnStartup = true;
         
@@ -4181,10 +4176,10 @@ public final class WildernessNickyScript extends Script {
             Rs2Tab.switchTo(InterfaceTab.INVENTORY);
             sleep(200);
             
-            Microbot.log("[WildernessNicky] Looting bag interface closed, inventory refreshed");
+            Microbot.log("[WildernessAgilityWithPK] Looting bag interface closed, inventory refreshed");
         } catch (NullPointerException e) {
             // Known issue: Items with null action data in inventory can cause Rs2Inventory operations to crash
-            Microbot.log("[WildernessNicky] Inventory error during looting bag check - will retry next cycle");
+            Microbot.log("[WildernessAgilityWithPK] Inventory error during looting bag check - will retry next cycle");
             waitingForLootingBagSync = false;
             hasCheckedLootingBagOnStartup = false; // Allow retry
 
@@ -4223,9 +4218,9 @@ public final class WildernessNickyScript extends Script {
         isTeleBlocked = Rs2Player.isTeleBlocked();
         if (isTeleBlocked && teleBlockDetectedTime == 0) {
             teleBlockDetectedTime = System.currentTimeMillis();
-            Microbot.log("[WildernessNicky] ⚠️ TELEBLOCK DETECTED - Escape options limited!");
+            Microbot.log("[WildernessAgilityWithPK] ⚠️ TELEBLOCK DETECTED - Escape options limited!");
         } else if (!isTeleBlocked && teleBlockDetectedTime != 0) {
-            Microbot.log("[WildernessNicky] ✅ Teleblock worn off");
+            Microbot.log("[WildernessAgilityWithPK] ✅ Teleblock worn off");
             teleBlockDetectedTime = 0;
         }
     }
@@ -4257,7 +4252,7 @@ public final class WildernessNickyScript extends Script {
                 // No incoming projectiles - check if we should disable prayers after timeout
                 long timeSinceLastProjectile = System.currentTimeMillis() - lastProjectileDetectionTime;
                 if (timeSinceLastProjectile > COMBAT_TIMEOUT && activeCombatPrayer != null) {
-                    Microbot.log("[WildernessNicky] 🛡️ No projectiles for " + (COMBAT_TIMEOUT/1000) + "s - disabling protection prayers");
+                    Microbot.log("[WildernessAgilityWithPK] 🛡️ No projectiles for " + (COMBAT_TIMEOUT/1000) + "s - disabling protection prayers");
                     disableAllProtectionPrayers();
                     activeCombatPrayer = null;
                 }
@@ -4276,20 +4271,14 @@ public final class WildernessNickyScript extends Script {
                 // Get the required prayer for this projectile
                 Rs2PrayerEnum requiredPrayer = WildernessProjectileType.getPrayerForProjectile(projectileId);
 
-                // ALWAYS ensure protection prayer is active for incoming attack
-                if (requiredPrayer != null) {
-                    // Check if we need to switch OR re-enable prayer
-                    boolean needsSwitch = (requiredPrayer != activeCombatPrayer);
-                    boolean prayerNotActive = !Rs2Prayer.isPrayerActive(requiredPrayer);
+                // Switch prayer if different from current
+                if (requiredPrayer != null && requiredPrayer != activeCombatPrayer) {
+                    String attackStyle = WildernessProjectileType.getAttackStyleName(projectileId);
+                    Microbot.log(String.format("[WildernessAgilityWithPK] ⚡ SWITCHING PRAYER: %s attack incoming! (Projectile ID: %d)",
+                        attackStyle, projectileId));
 
-                    if (needsSwitch || prayerNotActive) {
-                        String attackStyle = WildernessProjectileType.getAttackStyleName(projectileId);
-                        Microbot.log(String.format("[WildernessNicky] ⚡ %s PRAYER: %s attack incoming! (Projectile ID: %d)",
-                            needsSwitch ? "SWITCHING" : "ACTIVATING", attackStyle, projectileId));
-
-                        switchProtectionPrayer(requiredPrayer);
-                        lastCombatActionTime = System.currentTimeMillis();
-                    }
+                    switchProtectionPrayer(requiredPrayer);
+                    lastCombatActionTime = System.currentTimeMillis();
                 }
 
                 // Remove this projectile from tracking (it's about to hit)
@@ -4297,54 +4286,8 @@ public final class WildernessNickyScript extends Script {
             }
 
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error in projectile prayer switching: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error in projectile prayer switching: " + e.getMessage());
             e.printStackTrace();
-        }
-    }
-
-    /**
-     * MELEE ATTACK DETECTION (Fallback for attacks without projectiles)
-     * Detects when player is being attacked in melee range and activates Protect from Melee
-     * Only runs when no projectiles are being tracked
-     */
-    private void handleMeleeDetection() {
-        try {
-            Player localPlayer = Microbot.getClient().getLocalPlayer();
-            if (localPlayer == null) return;
-
-            Actor interacting = localPlayer.getInteracting();
-
-            // Check if being attacked by a player or NPC
-            if (interacting != null) {
-                // Get distance to attacker
-                WorldPoint attackerPos = interacting.getWorldLocation();
-                WorldPoint playerPos = localPlayer.getWorldLocation();
-
-                if (attackerPos != null && playerPos != null) {
-                    int distance = attackerPos.distanceTo(playerPos);
-
-                    // If attacker is in melee range (1-2 tiles) and no projectiles detected
-                    // Assume melee attack and protect
-                    if (distance <= 2) {
-                        // Only switch if not already protecting from melee
-                        if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
-                            Microbot.log("[WildernessNicky] 🗡️ Melee range attack detected - activating Protect from Melee");
-                            switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
-                            lastCombatActionTime = System.currentTimeMillis();
-                        }
-                    }
-                }
-            } else {
-                // No attacker - disable prayers after timeout
-                long timeSinceLastCombat = System.currentTimeMillis() - lastCombatActionTime;
-                if (timeSinceLastCombat > COMBAT_TIMEOUT && activeCombatPrayer != null) {
-                    Microbot.log("[WildernessNicky] 🛡️ No combat for " + (COMBAT_TIMEOUT/1000) + "s - disabling protection prayers");
-                    disableAllProtectionPrayers();
-                    activeCombatPrayer = null;
-                }
-            }
-        } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error in melee detection: " + e.getMessage());
         }
     }
 
@@ -4388,7 +4331,7 @@ public final class WildernessNickyScript extends Script {
                 }
             }
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error in prayer switching: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error in prayer switching: " + e.getMessage());
         }
     }
 
@@ -4407,22 +4350,22 @@ public final class WildernessNickyScript extends Script {
 
             // RANGED WEAPONS
             if (isRangedWeapon(weaponId)) {
-                Microbot.log("[WildernessNicky] 🛡️ Detected ranged attack - switching to Protect from Missiles");
+                Microbot.log("[WildernessAgilityWithPK] 🛡️ Detected ranged attack - switching to Protect from Missiles");
                 return Rs2PrayerEnum.PROTECT_RANGE;
             }
 
             // MAGIC WEAPONS/STAFF
             if (isMagicWeapon(weaponId)) {
-                Microbot.log("[WildernessNicky] 🛡️ Detected magic attack - switching to Protect from Magic");
+                Microbot.log("[WildernessAgilityWithPK] 🛡️ Detected magic attack - switching to Protect from Magic");
                 return Rs2PrayerEnum.PROTECT_MAGIC;
             }
 
             // DEFAULT TO MELEE (most common in wilderness)
-            Microbot.log("[WildernessNicky] 🛡️ Detected melee attack - switching to Protect from Melee");
+            Microbot.log("[WildernessAgilityWithPK] 🛡️ Detected melee attack - switching to Protect from Melee");
             return Rs2PrayerEnum.PROTECT_MELEE;
 
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error determining prayer: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error determining prayer: " + e.getMessage());
             return Rs2PrayerEnum.PROTECT_MELEE; // Safe default
         }
     }
@@ -4481,8 +4424,7 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
-     * Switches to the specified protection prayer.
-     * Ensures the prayer is active and tracking variable is updated.
+     * Switches to the specified protection prayer
      */
     private void switchProtectionPrayer(Rs2PrayerEnum prayer) {
         try {
@@ -4491,15 +4433,13 @@ public final class WildernessNickyScript extends Script {
                 Rs2Prayer.toggle(activeCombatPrayer, false);
             }
 
-            // Enable new protection prayer (if not already active)
+            // Enable new protection prayer
             if (!Rs2Prayer.isPrayerActive(prayer)) {
                 Rs2Prayer.toggle(prayer, true);
+                activeCombatPrayer = prayer;
             }
-
-            // ALWAYS update tracking variable to ensure consistency
-            activeCombatPrayer = prayer;
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error switching prayer: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error switching prayer: " + e.getMessage());
         }
     }
 
@@ -4512,7 +4452,7 @@ public final class WildernessNickyScript extends Script {
             Rs2Prayer.toggle(Rs2PrayerEnum.PROTECT_RANGE, false);
             Rs2Prayer.toggle(Rs2PrayerEnum.PROTECT_MAGIC, false);
         } catch (Exception e) {
-            Microbot.log("[WildernessNicky] Error disabling prayers: " + e.getMessage());
+            Microbot.log("[WildernessAgilityWithPK] Error disabling prayers: " + e.getMessage());
         }
     }
 
