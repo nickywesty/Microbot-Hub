@@ -312,6 +312,12 @@ public final class WildernessNickyScript extends Script {
     private int soloModeWorldHopAttempts = 0;
     private static final int MAX_SOLO_WORLD_HOP_ATTEMPTS = 3;
 
+    // ===== MASS MODE RELOGIN LOGIC =====
+    private boolean massLoggedOutDueToAttack = false;
+    private long massLogoutTime = 0;
+    private int massWorldToReturn = -1;
+    private WorldPoint massLogoutLocation = null;
+
     // ===== ESCAPE STEP RETRY COUNTERS (FAILSAFE) =====
     private int escapeEquipNecklaceAttempts = 0;
     private int escapeClimbRocksAttempts = 0;
@@ -384,8 +390,73 @@ public final class WildernessNickyScript extends Script {
         Microbot.log("[WildernessNickyScript] startup called - grace period active for " + (STARTUP_GRACE_PERIOD/1000) + " seconds");
         mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
             try {
-                if (!Microbot.isLoggedIn()) return;
-                
+                // ===== MASS MODE RELOGIN HANDLER =====
+                if (!Microbot.isLoggedIn()) {
+                    // Check if we should try to re-login (mass mode only)
+                    if (config.playMode() == WildernessNickyConfig.PlayMode.MASS && massLoggedOutDueToAttack) {
+                        long timeSinceLogout = System.currentTimeMillis() - massLogoutTime;
+                        int minDelay = config.massReloginDelayMin() * 1000;
+                        int maxDelay = config.massReloginDelayMax() * 1000;
+
+                        // Random delay between min and max
+                        int randomDelay = minDelay + (new Random().nextInt(maxDelay - minDelay + 1));
+
+                        if (timeSinceLogout >= randomDelay) {
+                            Microbot.log("[WildernessNicky] 🔄 Mass Mode: Re-logging after " + (timeSinceLogout/1000) + " seconds...");
+
+                            // The login happens automatically by the client when not logged in
+                            // We just need to wait and check if we're logged in
+                            sleep(2000); // Wait a bit for client to attempt login
+
+                            // Check if we're logged in now
+                            if (Microbot.isLoggedIn()) {
+                                Microbot.log("[WildernessNicky] ✅ Successfully re-logged in!");
+
+                                // Return to mass world if configured
+                                if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random && massWorldToReturn > 0) {
+                                    int targetWorld = massWorldToReturn;
+                                    int currentWorld = Rs2Player.getWorld();
+
+                                    if (currentWorld != targetWorld) {
+                                        Microbot.log("[WildernessNicky] 🌍 Hopping back to mass world " + targetWorld + "...");
+                                        boolean hopSuccess = Microbot.hopToWorld(targetWorld);
+                                        if (hopSuccess) {
+                                            sleepUntil(() -> Rs2Player.getWorld() == targetWorld, 15000);
+                                            sleep(2000, 3000);
+                                            Microbot.log("[WildernessNicky] ✅ Returned to mass world " + targetWorld);
+                                        }
+                                    }
+                                }
+
+                                // Reset escape state and return to course
+                                massLoggedOutDueToAttack = false;
+                                emergencyEscapeTriggered = false;
+                                scriptStartTime = System.currentTimeMillis(); // Reset grace period
+
+                                // Reset hit counters
+                                pvpHitCount = 0;
+                                clanMemberHitCount = 0;
+                                nonClanHitCount = 0;
+                                lastPvPDamageTime = 0;
+
+                                // Walk back to course if we have a saved location
+                                if (massLogoutLocation != null) {
+                                    Microbot.log("[WildernessNicky] 🚶 Walking back to course...");
+                                    Rs2Walker.walkTo(massLogoutLocation, 0);
+                                    sleepUntil(() -> Rs2Player.getWorldLocation().distanceTo(massLogoutLocation) <= 5, 10000);
+                                }
+
+                                // Resume course - figure out which obstacle is next
+                                currentState = ObstacleState.START;
+                                Microbot.log("[WildernessNicky] 🏃 Resuming wilderness agility course!");
+                            } else {
+                                Microbot.log("[WildernessNicky] ⚠️ Not logged in yet - will check again next cycle");
+                            }
+                        }
+                    }
+                    return;
+                }
+
                 // Check for death via health percentage or chat message detection
                 if (Rs2Player.getHealthPercentage() <= 0 || deathDetected) {
                     if (deathDetected) {
@@ -444,20 +515,71 @@ public final class WildernessNickyScript extends Script {
                 // Check for Phoenix Escape trigger - Phoenix necklace missing (skip during grace period)
                 if (config.phoenixEscape() && !emergencyEscapeTriggered && !gracePeriodActive) {
                     if (!hasPhoenixNecklace()) {
-                        triggerPhoenixEscape("Phoenix necklace missing from inventory/equipment");
+                        // If already in safe zone (Mage Bank), just go to banking instead of escape
+                        if (isInSafeZone()) {
+                            Microbot.log("[WildernessNicky] ⚠️ Phoenix necklace missing but already in safe zone - going to bank to regear");
+                            currentState = ObstacleState.BANKING;
+                        } else {
+                            triggerPhoenixEscape("Phoenix necklace missing from inventory/equipment");
+                        }
                     }
                 }
 
                 // ===== MASS MODE - WAIT FOR HIT THRESHOLDS =====
                 // Separate thresholds for clan members vs non-clan players
                 if (config.playMode() == WildernessNickyConfig.PlayMode.MASS && !emergencyEscapeTriggered && !gracePeriodActive) {
+                    boolean shouldLogout = false;
+                    String logoutReason = "";
+
                     // Check non-clan hits first (more dangerous)
                     if (nonClanHitCount >= config.nonClanHitThreshold()) {
-                        triggerPhoenixEscape("Took " + nonClanHitCount + " hits from NON-CLAN player (" + lastAttackerName + ")");
+                        shouldLogout = true;
+                        logoutReason = "Took " + nonClanHitCount + " hits from NON-CLAN player (" + lastAttackerName + ")";
                     }
                     // Check clan member hits (less urgent)
                     else if (clanMemberHitCount >= config.clanMemberHitThreshold()) {
-                        triggerPhoenixEscape("Took " + clanMemberHitCount + " hits from CLAN member (" + lastAttackerName + ")");
+                        shouldLogout = true;
+                        logoutReason = "Took " + clanMemberHitCount + " hits from CLAN member (" + lastAttackerName + ")";
+                    }
+
+                    if (shouldLogout) {
+                        // TOUGH IT OUT: Only logout if we have >= 150k GP in looting bag
+                        if (lootingBagValue >= 150000) {
+                            Microbot.log("[WildernessNicky] ⚠️ MASS MODE: " + logoutReason + " - logging out!");
+                            Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
+
+                            // Save state for re-login
+                            massLoggedOutDueToAttack = true;
+                            massLogoutTime = System.currentTimeMillis();
+                            massLogoutLocation = Rs2Player.getWorldLocation();
+
+                            // Save mass world if configured
+                            if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+                                massWorldToReturn = getConfigWorld(config.massWorld());
+                                Microbot.log("[WildernessNicky] 📌 Will return to world " + massWorldToReturn + " after re-login");
+                            }
+
+                            // Try to logout
+                            Rs2Player.logout();
+                            sleep(600); // Wait 1 tick
+
+                            // Check if logout succeeded
+                            if (!Microbot.isLoggedIn()) {
+                                Microbot.log("[WildernessNicky] ✅ Successfully logged out! Will re-login in " +
+                                    config.massReloginDelayMin() + "-" + config.massReloginDelayMax() + " seconds");
+                            } else {
+                                // Logout failed (in combat), trigger escape instead
+                                Microbot.log("[WildernessNicky] ❌ Logout failed (in combat) - triggering escape");
+                                triggerPhoenixEscape(logoutReason + " - logout failed, escaping instead");
+                            }
+                        } else {
+                            // Not enough value yet - tough it out!
+                            Microbot.log("[WildernessNicky] 💪 TOUGHING IT OUT: " + logoutReason + " but only " +
+                                NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (need 150k)");
+                            // Reset hit counters to give more time before next check
+                            nonClanHitCount = Math.max(0, nonClanHitCount - 1);
+                            clanMemberHitCount = Math.max(0, clanMemberHitCount - 1);
+                        }
                     }
                 }
 
@@ -478,12 +600,21 @@ public final class WildernessNickyScript extends Script {
                     boolean isPkerCombat = inCombat && (interacting instanceof net.runelite.api.Player);
 
                     if (playerThreat || isPkerCombat) {
+                        // TOUGH IT OUT: Only logout if we have >= 150k GP in looting bag
+                        if (lootingBagValue < 150000) {
+                            String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
+                            Microbot.log("[WildernessNicky] 💪 TOUGHING IT OUT: " + reason + " but only " +
+                                NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (need 150k) - continuing");
+                            return; // Skip logout, continue running course
+                        }
+
                         // REAL PKer THREAT - Instant logout attempt
                         attemptingLogout = true;
                         logoutAttemptStartTime = System.currentTimeMillis();
 
                         String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
                         Microbot.log("[WildernessNicky] ⚠️ " + reason + " - attempting instant logout!");
+                        Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
 
                         // Try to logout
                         Rs2Player.logout();
@@ -571,7 +702,14 @@ public final class WildernessNickyScript extends Script {
                     config.playMode() == WildernessNickyConfig.PlayMode.PROACTIVE_ONLY &&
                     !emergencyEscapeTriggered) {
                     if (detectNearbyThreat()) {
-                        triggerPhoenixEscape("Threatening player detected within 15 tiles (Proactive Detection)");
+                        // TOUGH IT OUT: Only escape if we have >= 150k GP in looting bag
+                        if (lootingBagValue < 150000) {
+                            Microbot.log("[WildernessNicky] 💪 TOUGHING IT OUT: Threatening player nearby but only " +
+                                NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (need 150k) - continuing");
+                        } else {
+                            Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
+                            triggerPhoenixEscape("Threatening player detected within 15 tiles (Proactive Detection)");
+                        }
                     }
                 }
 
@@ -597,6 +735,13 @@ public final class WildernessNickyScript extends Script {
                             sleep(1000, 1500); // Wait for food
                         }
                     }
+                }
+
+                // ===== SAFETY CHECK: Reset escape if already safe (e.g., after relogging) =====
+                if (emergencyEscapeTriggered && isInSafeZone() && canExitEscapeMode()) {
+                    Microbot.log("[WildernessNicky] ✅ Already in safe zone after login - resetting escape mode");
+                    resetEscapeMode();
+                    currentState = ObstacleState.BANKING; // Go to banking to regear
                 }
 
                 // Handle Emergency Escape if triggered
@@ -719,6 +864,12 @@ public final class WildernessNickyScript extends Script {
         worldHopRetryCount = 0;
         worldHopRetryStartTime = 0;
         soloModeWorldHopAttempts = 0;
+
+        // Reset mass mode variables
+        massLoggedOutDueToAttack = false;
+        massLogoutTime = 0;
+        massWorldToReturn = -1;
+        massLogoutLocation = null;
         
         // Reset web walking variables
         webWalkStartTime = 0;
@@ -1431,23 +1582,7 @@ public final class WildernessNickyScript extends Script {
         }
         // Force banking if config.bankAfterDispensers() > 0 and dispenserLoots >= threshold
         if (config.bankAfterDispensers() > 0 && dispenserLoots >= config.bankAfterDispensers()) {
-            // Enable Player Monitor when starting banking process if configured
-            if (config.enablePlayerMonitor()) {
-                try {
-                    Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                            .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                            .findFirst()
-                            .orElse(null);
-                    if (playerMonitor != null) {
-                        Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
-                    } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
-                    }
-                } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
-                }
-            }
+            // Player Monitor not used - built-in anti-PK system is sufficient
             if (config.enableWorldHop()) {
                 setupWorldHop();
                 currentState = ObstacleState.WORLD_HOP_1;
@@ -1459,23 +1594,7 @@ public final class WildernessNickyScript extends Script {
         // Force banking if config.bankNow() is enabled
         if (config.bankNow() || forceBankNextLoot) {
             forceBankNextLoot = false;
-            // Enable Player Monitor when starting banking process if configured
-            if (config.enablePlayerMonitor()) {
-                try {
-                    Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                            .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                            .findFirst()
-                            .orElse(null);
-                    if (playerMonitor != null) {
-                        Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
-                    } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
-                    }
-                } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
-                }
-            }
+            // Player Monitor not used - built-in anti-PK system is sufficient
             if (config.enableWorldHop()) {
                 setupWorldHop();
                 currentState = ObstacleState.WORLD_HOP_1;
@@ -1486,23 +1605,7 @@ public final class WildernessNickyScript extends Script {
         }
         // Only check banking threshold here - use looting bag value
         if (lootingBagValue >= config.leaveAtValue()) {
-            // Enable Player Monitor when starting banking process if configured
-            if (config.enablePlayerMonitor()) {
-                try {
-                    Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                            .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                            .findFirst()
-                            .orElse(null);
-                    if (playerMonitor != null) {
-                        Microbot.startPlugin(playerMonitor);
-                        Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
-                    } else {
-                        Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
-                    }
-                } catch (Exception e) {
-                    Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
-                }
-            }
+            // Player Monitor not used - built-in anti-PK system is sufficient
             if (config.enableWorldHop()) {
                 setupWorldHop();
                 currentState = ObstacleState.WORLD_HOP_1;
@@ -1696,24 +1799,7 @@ public final class WildernessNickyScript extends Script {
             int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
             if (coinCount < 150000) {
                 Microbot.log("[WildernessNicky] Not enough coins to deposit into dispenser (" + coinCount + " < 150000) - going to bank");
-                
-                // Enable Player Monitor when starting banking process if configured
-                if (config.enablePlayerMonitor()) {
-                    try {
-                        Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                                .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                                .findFirst()
-                                .orElse(null);
-                        if (playerMonitor != null) {
-                            Microbot.startPlugin(playerMonitor);
-                            Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
-                        } else {
-                            Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
-                        }
-                    } catch (Exception e) {
-                        Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
-                    }
-                }
+                // Player Monitor not used - built-in anti-PK system is sufficient
                 currentState = ObstacleState.BANKING;
                 return;
             }
@@ -2628,25 +2714,10 @@ public final class WildernessNickyScript extends Script {
 
         Microbot.log("[WildernessNicky] ⚠️ EMERGENCY ESCAPE TRIGGERED ⚠️");
         Microbot.log("[WildernessNicky] 📋 ESCAPE REASON: " + reason);
-        
-        // Enable Player Monitor for safety
-        if (config.enablePlayerMonitor()) {
-            try {
-                Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                        .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                        .findFirst()
-                        .orElse(null);
-                if (playerMonitor != null) {
-                    Microbot.startPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor enabled for Emergency Escape");
-                } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing escape without it");
-                }
-            } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to start Player Monitor for Emergency Escape: " + e.getMessage());
-            }
-        }
-        
+
+        // NOTE: Player Monitor is NOT enabled during emergency escape as it interferes with logout attempts
+        // The built-in prayer switching and logout system is sufficient
+
         // Set state to Emergency Escape (dedicated escape state)
         currentState = ObstacleState.EMERGENCY_ESCAPE;
     }
@@ -2885,25 +2956,54 @@ public final class WildernessNickyScript extends Script {
         // Gate location: WorldPoint(2998, 3931, 0)
         if (!hasOpenedGate && hasClimbedRocks) {
             WorldPoint currentLoc = Rs2Player.getWorldLocation();
+            WorldPoint mageBankPoint = new WorldPoint(2534, 4712, 0);
 
-            // Check if we're near gate area
-            if (currentLoc != null && currentLoc.distanceTo(GATE_AREA) <= 5) {
-                // Try to open gate if we can see it
-                TileObject gate = Rs2GameObject.getGameObject(GATE_OBJECT_ID);
-                if (gate != null && escapeOpenGateAttempts < MAX_ESCAPE_STEP_ATTEMPTS) {
-                    escapeOpenGateAttempts++;
-                    Microbot.log("[WildernessNicky] 🚪 Opening gate (Attempt " + escapeOpenGateAttempts + ")");
-                    Rs2GameObject.interact(GATE_OBJECT_ID, "Open");
-                } else if (escapeOpenGateAttempts >= MAX_ESCAPE_STEP_ATTEMPTS) {
-                    // Skip gate if too many attempts
-                    hasOpenedGate = true;
-                    Microbot.log("[WildernessNicky] ⚠️ Gate opening skipped - continuing");
-                }
-
-                // Check if we're past the gate (it's open or we're through)
-                if (currentLoc.distanceTo(new WorldPoint(2534, 4712, 0)) < currentLoc.distanceTo(GATE_AREA)) {
+            if (currentLoc != null) {
+                // Check if we're already past the gate (closer to Mage Bank than gate)
+                if (currentLoc.distanceTo(mageBankPoint) < currentLoc.distanceTo(GATE_AREA)) {
                     hasOpenedGate = true;
                     Microbot.log("[WildernessNicky] ✅ Past gate - heading to Mage Bank");
+                } else {
+                    // Not past gate yet - need to open it
+                    int distanceToGate = currentLoc.distanceTo(GATE_AREA);
+
+                    if (distanceToGate <= 5) {
+                        // Close enough - try to open gate
+                        // Find the CLOSEST gate to the gate area to avoid clicking wrong gates
+                        List<TileObject> gates = Rs2GameObject.getAll(o -> o.getId() == GATE_OBJECT_ID, 104);
+                        TileObject closestGate = null;
+                        int closestDistance = Integer.MAX_VALUE;
+
+                        for (TileObject gateObj : gates) {
+                            if (gateObj != null && gateObj.getWorldLocation() != null) {
+                                int distToGateArea = gateObj.getWorldLocation().distanceTo(GATE_AREA);
+                                if (distToGateArea < closestDistance) {
+                                    closestDistance = distToGateArea;
+                                    closestGate = gateObj;
+                                }
+                            }
+                        }
+
+                        if (closestGate != null && escapeOpenGateAttempts < MAX_ESCAPE_STEP_ATTEMPTS) {
+                            escapeOpenGateAttempts++;
+                            Microbot.log("[WildernessNicky] 🚪 Opening gate at " + closestGate.getWorldLocation() + " (Attempt " + escapeOpenGateAttempts + ")");
+                            Rs2GameObject.interact(closestGate, "Open");
+                            sleep(600, 1200); // Wait for gate interaction
+                        } else if (escapeOpenGateAttempts >= MAX_ESCAPE_STEP_ATTEMPTS) {
+                            // Skip gate if too many attempts
+                            hasOpenedGate = true;
+                            Microbot.log("[WildernessNicky] ⚠️ Gate opening skipped - continuing");
+                        }
+                    } else {
+                        // Too far from gate - walk towards it (recovery for falling off)
+                        if (!Rs2Player.isMoving() || distanceToGate > 10) {
+                            Microbot.log("[WildernessNicky] 🚶 Walking back to gate (Distance: " + distanceToGate + " tiles)");
+
+                            // Walk directly to the GATE_AREA point (not to a gate object, which might be the wrong one)
+                            Rs2Walker.walkTo(GATE_AREA, 2);
+                            sleep(600); // Wait for walk to start
+                        }
+                    }
                 }
             }
         }
@@ -3082,6 +3182,11 @@ public final class WildernessNickyScript extends Script {
      */
     private boolean isWorldAvailable(int worldNumber) {
         try {
+            // Validate world number first
+            if (worldNumber <= 0 || worldNumber > 9999) {
+                return false; // Invalid world number
+            }
+
             // Check if world exists and is accessible using getWorldList()
             net.runelite.api.World[] worlds = Microbot.getClient().getWorldList();
             if (worlds == null || worlds.length == 0) {
@@ -3159,18 +3264,20 @@ public final class WildernessNickyScript extends Script {
 
     private void handleSwapBack() {
         if (Rs2Player.getWorld() == originalWorld) {
-            if (config.joinFc()) {
+            // Only join FC if not already in it
+            if (config.joinFc() && !isInFriendChat()) {
                 joinFriendChat();
             }
             currentState = ObstacleState.PIPE;
             return;
         }
-        
+
         if (!attemptWorldHop(originalWorld, "returning to original world")) {
             return; // Stay in this state to retry
         }
-        
-        if (config.joinFc()) {
+
+        // Only join FC if not already in it
+        if (config.joinFc() && !isInFriendChat()) {
             joinFriendChat();
         }
         currentState = ObstacleState.PIPE;
@@ -3241,8 +3348,30 @@ public final class WildernessNickyScript extends Script {
             return true; // No channel configured
         }
 
-        net.runelite.api.clan.ClanChannel clanChannel = Microbot.getClient().getClanChannel();
-        return clanChannel != null && clanChannel.getName().equalsIgnoreCase(targetChannel.trim());
+        try {
+            net.runelite.api.clan.ClanChannel clanChannel = Microbot.getClient().getClanChannel();
+            if (clanChannel == null) {
+                return false; // Not in any channel
+            }
+
+            String currentChannelName = clanChannel.getName();
+            if (currentChannelName == null) {
+                return false; // Channel name unavailable
+            }
+
+            // Case-insensitive comparison with trimmed names
+            boolean inCorrectChannel = currentChannelName.trim().equalsIgnoreCase(targetChannel.trim());
+
+            // Debug log (remove after testing)
+            if (inCorrectChannel) {
+                Microbot.log("[WildernessNicky] ✅ Already in FC: " + currentChannelName);
+            }
+
+            return inCorrectChannel;
+        } catch (Exception e) {
+            Microbot.log("[WildernessNicky] ⚠️ Error checking FC status: " + e.getMessage());
+            return false; // Assume not in FC on error (safer to attempt join)
+        }
     }
 
     private void joinChatChannel(String channelName) {
@@ -3303,24 +3432,8 @@ public final class WildernessNickyScript extends Script {
     }
 
     private void handleWalkToLever() {
-        // Enable Player Monitor when starting banking process if configured
-        if (config.enablePlayerMonitor()) {
-            try {
-                Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                        .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                        .findFirst()
-                        .orElse(null);
-                if (playerMonitor != null) {
-                    Microbot.startPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor enabled for banking safety");
-                } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - continuing without it");
-                }
-            } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to start Player Monitor: " + e.getMessage());
-            }
-        }
-        
+        // Player Monitor not used - built-in anti-PK system is sufficient
+
         // Initialize web walk timeout tracking
         if (webWalkStartTime == 0) {
             webWalkStartTime = System.currentTimeMillis();
@@ -3468,12 +3581,36 @@ public final class WildernessNickyScript extends Script {
 
     private void handlePostBankConfig() {
         forceBankNextLoot = false;
-        if (config.swapBack() && Rs2Player.getWorld() != originalWorld) {
+
+        // MASS MODE: Hop to configured mass world if set
+        if (config.playMode() == WildernessNickyConfig.PlayMode.MASS &&
+            config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+
+            int targetMassWorld = getConfigWorld(config.massWorld());
+            int currentWorld = Rs2Player.getWorld();
+
+            if (currentWorld != targetMassWorld) {
+                Microbot.log("[WildernessNicky] 🌍 MASS MODE: Hopping to configured mass world " + targetMassWorld);
+                if (!attemptWorldHop(targetMassWorld, "mass mode world")) {
+                    return; // Stay in this state to retry
+                }
+                Microbot.log("[WildernessNicky] ✅ Successfully hopped to mass world " + targetMassWorld);
+            } else {
+                Microbot.log("[WildernessNicky] 📌 Already on mass world " + targetMassWorld);
+            }
+        }
+        // NORMAL MODE / SOLO MODE: Swap back to original world if enabled
+        else if (config.swapBack() && config.enableWorldHop() && originalWorld > 0 && Rs2Player.getWorld() != originalWorld) {
             if (!attemptWorldHop(originalWorld, "post-bank config")) {
                 return; // Stay in this state to retry
             }
+        } else if (config.swapBack() && !config.enableWorldHop()) {
+            // Swap back enabled but world hop disabled - log warning once
+            Microbot.log("[WildernessNicky] ⚠️ Swap back enabled but world hopping disabled - skipping swap back");
         }
-        if (config.joinFc()) {
+
+        // Only join FC if not already in it
+        if (config.joinFc() && !isInFriendChat()) {
             joinFriendChat();
         }
         // Force disable startAtCourse after banking
@@ -3579,24 +3716,9 @@ public final class WildernessNickyScript extends Script {
             entranceFeePaid = false;
         }
 
-        // Disable Player Monitor once we successfully reach the bank
-        if (config.enablePlayerMonitor()) {
-            try {
-                Plugin playerMonitor = Microbot.getPluginManager().getPlugins().stream()
-                        .filter(x -> x.getClass().getName().equals("net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin"))
-                        .findFirst()
-                        .orElse(null);
-                if (playerMonitor != null) {
-                    Microbot.stopPlugin(playerMonitor);
-                    Microbot.log("[WildernessNicky] Player Monitor disabled - safely reached bank");
-                } else {
-                    Microbot.log("[WildernessNicky] Player Monitor plugin not found - nothing to disable");
-                }
-            } catch (Exception e) {
-                Microbot.log("[WildernessNicky] Failed to stop Player Monitor: " + e.getMessage());
-            }
-        }
-        
+        // Player Monitor not used - no need to disable
+
+
         // ===== BANKED LOOT TRACKING =====
         // Track loot from inventory and looting bag before banking
         trackBankedLoot();

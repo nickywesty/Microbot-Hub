@@ -135,13 +135,13 @@ public interface WildernessNickyConfig extends Config {
     @ConfigItem(
         keyName = "nonClanHitThreshold",
         name = "  ⚔️ Non-Clan Hit Threshold",
-        description = "<html><b>MASS MODE ONLY:</b><br>Hits from NON-clan players before escaping.<br>Lower = safer from PKers</html>",
+        description = "<html><b>MASS MODE ONLY:</b><br>Hits from NON-clan players before escaping.<br>Lower = safer from PKers<br>Default: 4 hits</html>",
         position = 15,
         section = escapeSection,
         hidden = true
     )
     @Range(min = 1, max = 10)
-    default int nonClanHitThreshold() { return 2; }
+    default int nonClanHitThreshold() { return 4; }
 
     @ConfigItem(
         keyName = "nonClanHitThresholdVisible",
@@ -154,10 +154,72 @@ public interface WildernessNickyConfig extends Config {
     }
 
     @ConfigItem(
+        keyName = "massWorld",
+        name = "  🌍 Mass World (Stay On)",
+        description = "<html><b>MASS MODE ONLY:</b><br>Stay on this world during course runs (no hopping).<br>If Random, uses any world.<br>Recommended: Pick a consistent world for mass runs</html>",
+        position = 16,
+        section = escapeSection,
+        hidden = true
+    )
+    default BankWorldOption massWorld() { return BankWorldOption.Random; }
+
+    @ConfigItem(
+        keyName = "massWorldVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean massWorldVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
+        keyName = "massReloginDelayMin",
+        name = "  ⏱️ Relogin Delay Min (sec)",
+        description = "<html><b>MASS MODE ONLY:</b><br>Minimum seconds to wait before re-logging after logout from attack.<br>Default: 30 seconds</html>",
+        position = 17,
+        section = escapeSection,
+        hidden = true
+    )
+    @Range(min = 15, max = 300)
+    default int massReloginDelayMin() { return 30; }
+
+    @ConfigItem(
+        keyName = "massReloginDelayMinVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean massReloginDelayMinVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
+        keyName = "massReloginDelayMax",
+        name = "  ⏱️ Relogin Delay Max (sec)",
+        description = "<html><b>MASS MODE ONLY:</b><br>Maximum seconds to wait before re-logging after logout from attack.<br>Default: 60 seconds</html>",
+        position = 18,
+        section = escapeSection,
+        hidden = true
+    )
+    @Range(min = 15, max = 300)
+    default int massReloginDelayMax() { return 60; }
+
+    @ConfigItem(
+        keyName = "massReloginDelayMaxVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean massReloginDelayMaxVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
         keyName = "enableProactivePlayerDetection",
         name = "🔍 Proactive PKer Detection",
         description = "<html>Scan for PKers every 5 seconds.<br>Escape BEFORE being attacked if threatening player within 15 tiles.<br><b>Note:</b> Disabled in Mass Mode (uses hit detection instead)</html>",
-        position = 16,
+        position = 19,
         section = escapeSection
     )
     default boolean enableProactivePlayerDetection() { return true; }
@@ -168,7 +230,7 @@ public interface WildernessNickyConfig extends Config {
         description = "<html><b>1-tick accurate</b> prayer switching based on incoming projectiles.<br>" +
                       "More accurate than weapon-based (detects actual attacks).<br>" +
                       "Supports ALL wilderness magic, ranged, and melee projectiles.</html>",
-        position = 18,
+        position = 20,
         section = escapeSection
     )
     default boolean useProjectilePrayerSwitching() { return true; }
