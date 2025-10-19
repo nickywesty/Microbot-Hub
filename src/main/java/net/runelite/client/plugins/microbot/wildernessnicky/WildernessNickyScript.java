@@ -2630,7 +2630,7 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
-     * Handles Emergency Escape logic - with logout priority for solo mode
+     * Handles Emergency Escape logic - AGGRESSIVE logout attempts and prayers
      */
     private void handleEmergencyEscape() {
         if (!emergencyEscapeTriggered) {
@@ -2639,59 +2639,111 @@ public final class WildernessNickyScript extends Script {
 
         long timeSinceStart = System.currentTimeMillis() - emergencyEscapeStartTime;
 
-        // NEW: If in solo mode/logout priority, keep trying to logout while eating/praying
-        if (attemptingLogout) {
-            long logoutAttemptTime = System.currentTimeMillis() - logoutAttemptStartTime;
+        // ALWAYS try to logout first (regardless of attemptingLogout flag)
+        // This is an emergency - try logging out every loop iteration
+        Rs2Player.logout();
+        sleep(100);
 
-            // ENHANCED: Check if we're in combat (can't log)
-            boolean inCombat = Microbot.getClient().getLocalPlayer().getInteracting() != null;
+        // Check if logout succeeded
+        if (!Microbot.isLoggedIn()) {
+            Microbot.log("[WildernessNicky] ✅ Successfully logged out during emergency escape!");
 
-            if (inCombat) {
-                // If in NPC combat, try to find safe spot away from NPCs
-                WorldPoint safeSpot = findNearestSafeSpot();
-                if (safeSpot != null && !Rs2Player.getWorldLocation().equals(safeSpot)) {
-                    Microbot.log("[WildernessNicky] 🏃 Running to safe spot at " + safeSpot + " to logout...");
-                    Rs2Walker.walkTo(safeSpot, 0);
+            // If in solo mode, world hop to find safer world
+            if (config.playMode() == WildernessNickyConfig.PlayMode.SOLO && soloModeWorldHopAttempts < MAX_SOLO_WORLD_HOP_ATTEMPTS) {
+                soloModeWorldHopAttempts++;
+                Microbot.log("[WildernessNicky] 🌍 Solo mode world hop attempt " + soloModeWorldHopAttempts + "/" + MAX_SOLO_WORLD_HOP_ATTEMPTS);
+                sleep(2000); // Wait 2 seconds before world hop
 
-                    // Eat and pray while moving
-                    if (Rs2Player.getHealthPercentage() < 60) {
-                        eatFood();
+                int currentWorld = Rs2Player.getWorld();
+                int nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+
+                // Make sure we don't hop to the same world
+                int attempts = 0;
+                while (nextWorld == currentWorld && attempts < 10) {
+                    nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+                    attempts++;
+                }
+
+                if (nextWorld > 0 && nextWorld != currentWorld) {
+                    Microbot.log("[WildernessNicky] Attempting to hop from world " + currentWorld + " to world " + nextWorld);
+                    Microbot.cantHopWorld = false;
+
+                    boolean hopSuccess = Microbot.hopToWorld(nextWorld);
+                    if (hopSuccess) {
+                        final int targetWorld = nextWorld;
+                        boolean hopConfirmed = sleepUntil(() -> Rs2Player.getWorld() == targetWorld && Microbot.isLoggedIn(), 15000);
+
+                        if (hopConfirmed) {
+                            Microbot.log("[WildernessNicky] ✅ Successfully hopped to world " + nextWorld);
+                            // Reset escape state and continue
+                            resetEscapeMode();
+                            currentState = ObstacleState.START;
+                            return;
+                        } else {
+                            Microbot.log("[WildernessNicky] ⚠️ World hop not confirmed");
+                        }
                     }
-                    enableBestProtectionPrayer();
+                } else {
+                    Microbot.log("[WildernessNicky] ⚠️ No valid world found for hopping");
+                }
 
-                    sleep(600);
-                    return;
+                // If max hops reached, stop plugin
+                if (soloModeWorldHopAttempts >= MAX_SOLO_WORLD_HOP_ATTEMPTS) {
+                    Microbot.log("[WildernessNicky] ❌ Max world hop attempts reached - stopping plugin");
+                    sleep(2000);
+                    Microbot.stopPlugin(plugin);
                 }
             }
 
-            // Try to logout every tick
-            Rs2Player.logout();
-            sleep(100); // Small delay to check if logout succeeded
+            return;
+        }
 
-            // Check if logout succeeded
-            if (!Microbot.isLoggedIn()) {
-                Microbot.log("[WildernessNicky] ✅ Successfully logged out during escape!");
-                return;
+        // If we're still here, logout failed - we're in combat
+        // IMMEDIATELY activate protection prayers based on attacker
+        Actor attacker = Microbot.getClient().getLocalPlayer().getInteracting();
+        if (attacker != null) {
+            if (attacker instanceof net.runelite.api.Player) {
+                // Being attacked by player - use Protect from Melee by default (most common)
+                // Projectile system will override if ranged/mage detected
+                if (Rs2Player.hasPrayerPoints() && config.useProjectilePrayerSwitching()) {
+                    if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
+                        Microbot.log("[WildernessNicky] 🛡️ Player attacking - activating Protect from Melee");
+                        switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
+                    }
+                }
+            } else if (attacker instanceof net.runelite.api.NPC) {
+                // Being attacked by NPC (skeleton) - use Protect from Melee
+                if (Rs2Player.hasPrayerPoints()) {
+                    if (activeCombatPrayer != Rs2PrayerEnum.PROTECT_MELEE) {
+                        Microbot.log("[WildernessNicky] 🛡️ NPC attacking - activating Protect from Melee");
+                        switchProtectionPrayer(Rs2PrayerEnum.PROTECT_MELEE);
+                    }
+                }
             }
+        }
 
-            // Eat food if low HP while trying to logout
-            if (Rs2Player.getHealthPercentage() < 60) {
-                eatFood();
-            }
+        // Eat food if low HP
+        if (Rs2Player.getHealthPercentage() < 60) {
+            eatFood();
+        }
 
-            // ENHANCED: Activate best protection prayer based on situation
-            enableBestProtectionPrayer();
+        // Check if we've been trying to logout long enough - if so, give up and run
+        if (attemptingLogout) {
+            long logoutAttemptTime = System.currentTimeMillis() - logoutAttemptStartTime;
 
-            // If we've been trying to logout for MAX_LOGOUT_ATTEMPT_TIME, give up and proceed with physical escape
-            if (logoutAttemptTime > MAX_LOGOUT_ATTEMPT_TIME) {
-                Microbot.log("[WildernessNicky] ⏱️ Logout attempts timed out - proceeding with physical escape to Mage Bank");
-                attemptingLogout = false; // Stop trying, start running
+            if (logoutAttemptTime < MAX_LOGOUT_ATTEMPT_TIME) {
+                // Still within logout attempt window - don't proceed to physical escape yet
+                Microbot.log("[WildernessNicky] 🔄 Logout attempt " + (logoutAttemptTime/1000) + "s / " + (MAX_LOGOUT_ATTEMPT_TIME/1000) + "s... (combat detected)");
+                return; // Keep trying logout (already tried above)
             } else {
-                // Still trying to logout, don't proceed with escape steps yet
-                Microbot.log("[WildernessNicky] 🔄 Logout attempt " + (logoutAttemptTime/1000) + "s / " + (MAX_LOGOUT_ATTEMPT_TIME/1000) + "s...");
-                sleep(600); // Wait 1 game tick
-                return;
+                // Logout timeout reached - proceed with physical escape
+                Microbot.log("[WildernessNicky] ⏱️ Logout timeout - proceeding with physical escape to Mage Bank");
+                attemptingLogout = false;
+                // Fall through to physical escape steps below
             }
+        } else {
+            // Not in logout mode, proceed directly to physical escape
+            Microbot.log("[WildernessNicky] 🏃 Beginning physical escape to Mage Bank...");
         }
 
         // SAFETY CHECK: Allow escape mode to be cancelled if conditions are met
