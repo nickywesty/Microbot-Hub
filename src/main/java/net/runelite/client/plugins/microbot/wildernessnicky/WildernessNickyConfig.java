@@ -155,13 +155,13 @@ public interface WildernessNickyConfig extends Config {
 
     @ConfigItem(
         keyName = "massWorld",
-        name = "  🌍 Mass World (Stay On)",
-        description = "<html><b>MASS MODE ONLY:</b><br>Stay on this world during course runs (no hopping).<br>If Random, uses any world.<br>Recommended: Pick a consistent world for mass runs</html>",
+        name = "  🌍 Mass World Number",
+        description = "<html><b>MASS MODE ONLY:</b><br>Stay on this specific world during course runs (no hopping).<br>Enter world number (e.g., 416, 417, etc.)<br>Set to 0 or leave empty for random world selection.<br>Recommended: Pick a consistent world for mass runs</html>",
         position = 16,
         section = escapeSection,
         hidden = true
     )
-    default BankWorldOption massWorld() { return BankWorldOption.Random; }
+    default String massWorld() { return ""; }
 
     @ConfigItem(
         keyName = "massWorldVisible",

@@ -119,6 +119,19 @@ public final class WildernessNickyScript extends Script {
     private boolean hasReachedSafeZone = false;
     private long safeZoneReachedTime = 0;
 
+    // ===== SAFE LOGOUT LOCATIONS (WILDERNESS AGILITY COURSE) =====
+    // These are specific safe spots within the course where skeletons won't attack
+    // All locations are in Region ID 11837 (Wilderness Agility Course area)
+    private static final List<WorldPoint> SAFE_LOGOUT_LOCATIONS = Arrays.asList(
+        new WorldPoint(3005, 3933, 0), // Region location (61,29) - Near start
+        new WorldPoint(3002, 3940, 0), // Region location (58,36) - Mid course
+        new WorldPoint(3006, 3941, 0), // Region location (62,37) - Mid course
+        new WorldPoint(3006, 3946, 0), // Region location (62,42) - Upper course
+        new WorldPoint(3005, 3963, 0), // Region location (61,59) - Far north
+        new WorldPoint(3001, 3944, 0)  // Region location (54,40) - Final safe spot (no skeletons)
+    );
+    private static final int SAFE_LOGOUT_RADIUS = 2; // Must be within 2 tiles of safe spot
+
     // --- Config & Plugin ---
     private WildernessNickyConfig config;
     @Inject
@@ -412,6 +425,10 @@ public final class WildernessNickyScript extends Script {
     private List<Integer> parsedMassWorlds = new ArrayList<>();
     private int currentSoloWorldIndex = 0;
     private int currentMassWorldIndex = 0;
+
+    // ===== FC JOIN COOLDOWN TRACKING =====
+    private long lastFcJoinAttemptTime = 0;
+    private static final long FC_JOIN_COOLDOWN = 60000; // 60 seconds cooldown between join attempts
 
     // =============================================================================
     // WORLD PARSING AND VALIDATION HELPERS
@@ -1140,8 +1157,8 @@ public final class WildernessNickyScript extends Script {
                             if (Microbot.isLoggedIn()) {
                                 Microbot.log("[WildernessNicky] ✅ Successfully re-logged in!");
 
-                                // Return to mass world if configured (custom worlds or dropdown)
-                                if ((!parsedMassWorlds.isEmpty() || config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) && massWorldToReturn > 0) {
+                                // Return to mass world if configured (custom worlds or text box)
+                                if ((!parsedMassWorlds.isEmpty() || getMassWorldFromConfig() > 0) && massWorldToReturn > 0) {
                                     int targetWorld = massWorldToReturn;
                                     int currentWorld = Rs2Player.getWorld();
 
@@ -1286,10 +1303,13 @@ public final class WildernessNickyScript extends Script {
                                 // Use custom mass world list
                                 massWorldToReturn = parsedMassWorlds.get(0); // Always use first world for consistency
                                 Microbot.log("[WildernessNicky] 📌 Will return to custom mass world " + massWorldToReturn + " after re-login");
-                            } else if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
-                                // Fallback to dropdown selection
-                                massWorldToReturn = getConfigWorld(config.massWorld());
-                                Microbot.log("[WildernessNicky] 📌 Will return to world " + massWorldToReturn + " after re-login");
+                            } else {
+                                int configWorld = getMassWorldFromConfig();
+                                if (configWorld > 0) {
+                                    // Use text box world number
+                                    massWorldToReturn = configWorld;
+                                    Microbot.log("[WildernessNicky] 📌 Will return to world " + massWorldToReturn + " after re-login");
+                                }
                             }
 
                             // Try to logout
@@ -2475,8 +2495,77 @@ public final class WildernessNickyScript extends Script {
      * If missing any, goes to bank to withdraw them
      */
     private void handleStartupInventoryCheck() {
-        Microbot.log("[WildernessNicky] 📋 Checking startup inventory...");
+        Microbot.log("[WildernessNicky] 📋 Checking startup requirements...");
 
+        // ===== REQUIREMENT CHECK 1: AGILITY LEVEL =====
+        int currentAgility = Rs2Player.getRealSkillLevel(AGILITY);
+        boolean hasAgilityLevel = currentAgility >= 52; // Wilderness Agility requires 52 agility
+        Microbot.log("[WildernessNicky] Agility Level: " + currentAgility + " / 52 " + (hasAgilityLevel ? "✅" : "❌"));
+
+        if (!hasAgilityLevel) {
+            Microbot.log("[WildernessNicky] ❌ INSUFFICIENT AGILITY LEVEL!");
+            Microbot.log("[WildernessNicky] Wilderness Agility Course requires 52 Agility (current: " + currentAgility + ")");
+            Microbot.log("[WildernessNicky] Plugin will stop.");
+            Microbot.stopPlugin(plugin);
+            return;
+        }
+
+        // ===== REQUIREMENT CHECK 2: LOCATION CHECK (only if startAtCourse is enabled) =====
+        if (config.startAtCourse()) {
+            WorldPoint playerLoc = Rs2Player.getWorldLocation();
+            if (playerLoc != null) {
+                // Wilderness Agility Course area (roughly 2990-3015 X, 3930-3970 Y)
+                boolean atCourse = playerLoc.getX() >= 2990 && playerLoc.getX() <= 3015 &&
+                                   playerLoc.getY() >= 3930 && playerLoc.getY() <= 3970 &&
+                                   playerLoc.getPlane() == 0;
+
+                Microbot.log("[WildernessNicky] Location Check: " + (atCourse ? "✅ At Wilderness Agility Course" : "❌ Not at course"));
+
+                if (!atCourse) {
+                    Microbot.log("[WildernessNicky] ❌ START AT COURSE ENABLED BUT YOU'RE NOT AT THE COURSE!");
+                    Microbot.log("[WildernessNicky] Current location: " + playerLoc);
+                    Microbot.log("[WildernessNicky] Either disable 'Start at Course' or move to the Wilderness Agility Course.");
+                    Microbot.log("[WildernessNicky] Plugin will stop.");
+                    Microbot.stopPlugin(plugin);
+                    return;
+                }
+            }
+        }
+
+        // ===== REQUIREMENT CHECK 3: RING OF WEALTH CHARGES (if using for teleports) =====
+        boolean hasRingOfWealth = false;
+        int rowCharges = 0;
+
+        // Check inventory first
+        for (String rowName : new String[]{"Ring of wealth (5)", "Ring of wealth (4)", "Ring of wealth (3)", "Ring of wealth (2)", "Ring of wealth (1)"}) {
+            if (Rs2Inventory.hasItem(rowName)) {
+                hasRingOfWealth = true;
+                rowCharges = Integer.parseInt(rowName.replaceAll("[^0-9]", ""));
+                break;
+            }
+        }
+
+        // Check equipment if not in inventory
+        if (!hasRingOfWealth) {
+            for (String rowName : new String[]{"Ring of wealth (5)", "Ring of wealth (4)", "Ring of wealth (3)", "Ring of wealth (2)", "Ring of wealth (1)"}) {
+                if (Rs2Equipment.isWearing(rowName)) {
+                    hasRingOfWealth = true;
+                    rowCharges = Integer.parseInt(rowName.replaceAll("[^0-9]", ""));
+                    break;
+                }
+            }
+        }
+
+        if (hasRingOfWealth) {
+            Microbot.log("[WildernessNicky] Ring of Wealth: ✅ (" + rowCharges + " charges)");
+            if (rowCharges < 1) {
+                Microbot.log("[WildernessNicky] ⚠️ WARNING: Ring of Wealth has no charges! You may need this for teleporting.");
+            }
+        } else {
+            Microbot.log("[WildernessNicky] Ring of Wealth: ⚠️ Not found (optional, but useful for Grand Exchange teleports)");
+        }
+
+        // ===== INVENTORY CHECKS =====
         boolean hasKnife = Rs2Inventory.hasItem("Knife");
         boolean hasLootingBag = Rs2Inventory.hasItem("Looting bag");
         int coinCount = Rs2Inventory.itemQuantity(COINS_ID);
@@ -3686,9 +3775,31 @@ public final class WildernessNickyScript extends Script {
         boolean inSkeletonCombat = isInSkeletonCombat();
 
         if (inSkeletonCombat) {
-            // NEW: Get best escape zone based on current position
-            WorldPoint bestEscapeZone = getBestSkeletonEscapeZone();
             WorldPoint currentLoc = Rs2Player.getWorldLocation();
+
+            // PRIORITY 1: Check if already at a safe logout location
+            // If at safe spot, just spam logout (combat will break when skeletons de-aggro)
+            if (isSafeLogoutLocation()) {
+                Microbot.log("[WildernessNicky] ✅ Already at safe logout spot - spamming logout to break skeleton combat");
+                // Logout spam happens at line 3743, so just return and let it continue
+                return;
+            }
+
+            // PRIORITY 2: If close to a safe logout spot (within 10 tiles), go there instead
+            WorldPoint closestSafeSpot = getClosestSafeLogoutLocation();
+            if (closestSafeSpot != null && currentLoc != null) {
+                int distanceToSafeSpot = currentLoc.distanceTo(closestSafeSpot);
+                if (distanceToSafeSpot <= 10) {
+                    if (!Rs2Player.isMoving() || distanceToSafeSpot > 3) {
+                        Microbot.log("[WildernessNicky] 🦴 Skeleton combat - running to safe logout spot at: " + closestSafeSpot + " (Distance: " + distanceToSafeSpot + " tiles)");
+                        Rs2Walker.walkTo(closestSafeSpot, 2);
+                    }
+                    return; // Keep trying to reach safe logout spot
+                }
+            }
+
+            // PRIORITY 3: Get best escape zone based on current position (ladder/gate/etc.)
+            WorldPoint bestEscapeZone = getBestSkeletonEscapeZone();
 
             // If near ladder, try to go down (instant combat break)
             if (currentLoc != null && currentLoc.distanceTo(LADDER_AREA) < 10) {
@@ -4003,7 +4114,48 @@ public final class WildernessNickyScript extends Script {
         if (currentLoc != null) {
             int distanceToBank = currentLoc.distanceTo(mageBankPoint);
 
-            // Check if we've reached Mage Bank safe zone
+            // ===== PRIORITY 1: CHECK IF AT SAFE LOGOUT LOCATION (WILDERNESS AGILITY COURSE) =====
+            // If player is at a safe logout spot within the course, force logout immediately
+            // This prevents the long run to Mage Bank and allows quick logout at nearby safe spots
+            if (isSafeLogoutLocation()) {
+                Microbot.log("[WildernessNicky] ✅ At safe logout location in Wilderness Agility Course!");
+                Microbot.log("[WildernessNicky] 📋 Escape reason: " + lastEscapeReason);
+                Microbot.log("[WildernessNicky] 🚪 Forcing logout at safe spot...");
+
+                // Force logout until successful
+                int logoutAttempts = 0;
+                while (Microbot.isLoggedIn() && logoutAttempts < 50) {
+                    Rs2Player.logout();
+                    sleep(100);
+                    logoutAttempts++;
+                }
+
+                // Reset escape state
+                resetEscapeMode();
+                return;
+            }
+
+            // ===== PRIORITY 2: CHECK IF CLOSE TO A SAFE LOGOUT LOCATION =====
+            // If within 10 tiles of a safe logout spot, navigate there instead of Mage Bank
+            WorldPoint closestSafeSpot = getClosestSafeLogoutLocation();
+            if (closestSafeSpot != null) {
+                int distanceToSafeSpot = currentLoc.distanceTo(closestSafeSpot);
+
+                // If safe spot is closer than Mage Bank and within 15 tiles, go there instead
+                if (distanceToSafeSpot <= 15 && distanceToSafeSpot < distanceToBank) {
+                    if (!Rs2Player.isMoving() || distanceToSafeSpot > 3) {
+                        if (escapeWalkToMageBankAttempts % 5 == 1) { // Log every 5 attempts to reduce spam
+                            Microbot.log("[WildernessNicky] 🏃 Running to nearby safe logout spot (Distance: " + distanceToSafeSpot + " tiles)");
+                        }
+                        Rs2Walker.walkTo(closestSafeSpot, 2);
+                        escapeWalkToMageBankAttempts++;
+                        return; // Skip Mage Bank logic and try again next iteration
+                    }
+                }
+            }
+
+            // ===== PRIORITY 3: CHECK IF REACHED MAGE BANK SAFE ZONE =====
+            // Only navigate to Mage Bank if no safe logout spots are nearby
             if (distanceToBank <= 10) {
                 Microbot.log("[WildernessNicky] ✅ Reached Mage Bank safe zone!");
                 Microbot.log("[WildernessNicky] 📋 Escape reason: " + lastEscapeReason);
@@ -4131,6 +4283,56 @@ public final class WildernessNickyScript extends Script {
         // Priority 4: Default to START_POINT
         Microbot.log("[WildernessNicky] ⬅️ Default escape - running to start");
         return START_POINT;
+    }
+
+    /**
+     * SAFE LOGOUT LOCATION CHECK
+     * Checks if the player is currently at a safe logout location within the Wilderness Agility Course.
+     * Safe locations are spots where skeletons won't attack, allowing for safe logouts.
+     *
+     * @return true if player is within SAFE_LOGOUT_RADIUS (2 tiles) of any safe logout location
+     */
+    private boolean isSafeLogoutLocation() {
+        WorldPoint currentPos = Rs2Player.getWorldLocation();
+        if (currentPos == null) {
+            return false;
+        }
+
+        // Check if player is within radius of any safe logout location
+        for (WorldPoint safeSpot : SAFE_LOGOUT_LOCATIONS) {
+            if (currentPos.distanceTo(safeSpot) <= SAFE_LOGOUT_RADIUS) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * CLOSEST SAFE LOGOUT LOCATION
+     * Finds the nearest safe logout location to the player's current position.
+     * Used when navigating to a safe spot before logging out.
+     *
+     * @return WorldPoint of the closest safe logout location, or null if no safe spots available
+     */
+    private WorldPoint getClosestSafeLogoutLocation() {
+        WorldPoint currentPos = Rs2Player.getWorldLocation();
+        if (currentPos == null) {
+            return null;
+        }
+
+        WorldPoint closestSafeSpot = null;
+        int closestDistance = Integer.MAX_VALUE;
+
+        for (WorldPoint safeSpot : SAFE_LOGOUT_LOCATIONS) {
+            int distance = currentPos.distanceTo(safeSpot);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestSafeSpot = safeSpot;
+            }
+        }
+
+        return closestSafeSpot;
     }
 
     /**
@@ -4266,6 +4468,28 @@ public final class WildernessNickyScript extends Script {
         bankWorld2 = getConfigWorld(config.bankWorld2());
     }
 
+    /**
+     * Parse mass world from config (String input)
+     * @return world number, or -1 if not set/invalid
+     */
+    private int getMassWorldFromConfig() {
+        String massWorldStr = config.massWorld();
+        if (massWorldStr == null || massWorldStr.trim().isEmpty()) {
+            return -1;
+        }
+
+        try {
+            int world = Integer.parseInt(massWorldStr.trim());
+            if (world <= 0) {
+                return -1; // 0 or negative means random/not set
+            }
+            return world;
+        } catch (NumberFormatException e) {
+            Microbot.log("[WildernessNicky] ⚠️ Invalid mass world number: " + massWorldStr);
+            return -1;
+        }
+    }
+
     private int getConfigWorld(WildernessNickyConfig.BankWorldOption option) {
         if (option == WildernessNickyConfig.BankWorldOption.Random) {
             // Pick a random world from the enum list, skipping the current world
@@ -4371,6 +4595,17 @@ public final class WildernessNickyScript extends Script {
     }
 
     private void joinFriendChat() {
+        // Check cooldown to prevent spam
+        long timeSinceLastAttempt = System.currentTimeMillis() - lastFcJoinAttemptTime;
+        if (timeSinceLastAttempt < FC_JOIN_COOLDOWN) {
+            // Still on cooldown - don't spam join attempts
+            return;
+        }
+
+        // Update last attempt time
+        lastFcJoinAttemptTime = System.currentTimeMillis();
+
+        Microbot.log("[WildernessNicky] 🔗 Attempting to join FC: " + config.fcChannel());
         joinChatChannel(config.fcChannel());
     }
 
@@ -4798,9 +5033,9 @@ public final class WildernessNickyScript extends Script {
             // Try custom world list first
             if (!parsedMassWorlds.isEmpty()) {
                 targetMassWorld = parsedMassWorlds.get(0); // Always use first world for mass mode consistency
-            } else if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
-                // Fallback to dropdown
-                targetMassWorld = getConfigWorld(config.massWorld());
+            } else {
+                // Use text box world number
+                targetMassWorld = getMassWorldFromConfig();
             }
 
             if (targetMassWorld > 0) {
@@ -4991,12 +5226,35 @@ public final class WildernessNickyScript extends Script {
                 Microbot.log("[WildernessNicky] Closed looting bag not available, trying open version");
                 Rs2Bank.withdrawOne(LOOTING_BAG_OPEN_ID);
                 boolean openSuccess = sleepUntil(() -> Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID), 3000);
-                
+
                 if (openSuccess) {
                     Microbot.log("[WildernessNicky] Successfully withdrew open looting bag");
                     needsLootingBagActivation = false; // No need to activate, already open
                 } else {
-                    Microbot.log("[WildernessNicky] Failed to withdraw looting bag in any state");
+                    // Check if looting bag exists in bank at all
+                    boolean lootingBagInBank = Rs2Bank.hasBankItem("Looting bag") || Rs2Bank.hasBankItem("Open looting bag");
+
+                    if (!lootingBagInBank) {
+                        Microbot.log("[WildernessNicky] ⚠️ No looting bag in bank! Starting GE buying phase...");
+
+                        // Withdraw Ring of Wealth for GE teleport
+                        if (!Rs2Inventory.hasItem("Ring of wealth")) {
+                            Microbot.log("[WildernessNicky] Withdrawing Ring of Wealth for GE teleport");
+                            Rs2Bank.withdrawOne("Ring of wealth");
+                            sleepUntil(() -> Rs2Inventory.hasItem("Ring of wealth"), 3000);
+                        }
+
+                        Rs2Bank.closeBank();
+                        sleep(600);
+
+                        // Transition to looting bag buying state
+                        needsToBuyNotedLootingBag = true;
+                        currentState = ObstacleState.GE_BUY_NOTED_LOOTING_BAG;
+                        Microbot.log("[WildernessNicky] State changed to GE_BUY_NOTED_LOOTING_BAG");
+                        return;
+                    } else {
+                        Microbot.log("[WildernessNicky] Failed to withdraw looting bag, but it exists in bank - retrying");
+                    }
                 }
             }
         }
