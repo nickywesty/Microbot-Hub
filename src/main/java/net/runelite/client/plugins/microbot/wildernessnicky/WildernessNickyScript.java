@@ -1149,12 +1149,13 @@ public final class WildernessNickyScript extends Script {
                         if (timeSinceLogout >= randomDelay) {
                             Microbot.log("[WildernessNicky] 🔄 Mass Mode: Re-logging after " + (timeSinceLogout/1000) + " seconds...");
 
-                            // The login happens automatically by the client when not logged in
-                            // We just need to wait and check if we're logged in
-                            sleep(2000); // Wait a bit for client to attempt login
+                            // Wait for client to auto-login or try to trigger login
+                            // The RuneLite client should automatically attempt to log back in
+                            // Give it up to 30 seconds to complete login
+                            boolean loginSuccess = sleepUntil(() -> Microbot.isLoggedIn(), 30000);
 
                             // Check if we're logged in now
-                            if (Microbot.isLoggedIn()) {
+                            if (loginSuccess && Microbot.isLoggedIn()) {
                                 Microbot.log("[WildernessNicky] ✅ Successfully re-logged in!");
 
                                 // Return to mass world if configured (custom worlds or text box)
@@ -1195,7 +1196,11 @@ public final class WildernessNickyScript extends Script {
                                 currentState = ObstacleState.START;
                                 Microbot.log("[WildernessNicky] 🏃 Resuming wilderness agility course!");
                             } else {
-                                Microbot.log("[WildernessNicky] ⚠️ Not logged in yet - will check again next cycle");
+                                Microbot.log("[WildernessNicky] ⚠️ Login failed after 30 seconds - please log in manually");
+                                Microbot.log("[WildernessNicky] ⚠️ Make sure Auto-Login plugin is enabled or log in manually");
+                                Microbot.log("[WildernessNicky] Plugin will continue trying every 5 seconds...");
+                                // Reset the logout time so we try again soon
+                                massLogoutTime = System.currentTimeMillis() - randomDelay + 5000; // Try again in 5 seconds
                             }
                         }
                     }
@@ -1276,10 +1281,24 @@ public final class WildernessNickyScript extends Script {
                     boolean shouldLogout = false;
                     String logoutReason = "";
 
+                    // Check if player has food (anglerfish, karambwan, or manta ray)
+                    boolean hasFood = Rs2Inventory.hasItem(FOOD_PRIMARY) ||
+                                      Rs2Inventory.hasItem(FOOD_SECONDARY) ||
+                                      Rs2Inventory.hasItem(FOOD_TERTIARY);
+
+                    // Dynamic threshold: if we have food, allow more hits before logging out
+                    int effectiveNonClanThreshold = config.nonClanHitThreshold();
+                    if (hasFood && effectiveNonClanThreshold < 3) {
+                        effectiveNonClanThreshold = 3; // Minimum 3 hits if we have food
+                    }
+
                     // Check non-clan hits first (more dangerous)
-                    if (nonClanHitCount >= config.nonClanHitThreshold()) {
+                    if (nonClanHitCount >= effectiveNonClanThreshold) {
                         shouldLogout = true;
                         logoutReason = "Took " + nonClanHitCount + " hits from NON-CLAN player (" + lastAttackerName + ")";
+                        if (hasFood && effectiveNonClanThreshold > config.nonClanHitThreshold()) {
+                            logoutReason += " (threshold raised to " + effectiveNonClanThreshold + " due to food)";
+                        }
                     }
                     // Check clan member hits (less urgent)
                     else if (clanMemberHitCount >= config.clanMemberHitThreshold()) {
