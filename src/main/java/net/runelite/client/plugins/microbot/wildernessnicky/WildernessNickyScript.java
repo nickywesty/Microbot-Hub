@@ -4531,17 +4531,31 @@ public final class WildernessNickyScript extends Script {
             return; // Stay in this state to retry
         }
         sleep(4000); // Wait 4 seconds after hop
+
+        // Leave FC on first hop (before banking)
         if (config.leaveFcOnWorldHop()) {
             leaveFriendChat();
+            sleep(1000); // Wait for FC leave to complete
         }
-        currentState = ObstacleState.WORLD_HOP_2;
+
+        // After hopping to world 1 and leaving FC, go to lever/banking
+        currentState = ObstacleState.WALK_TO_LEVER;
     }
 
     private void handleWorldHop2() {
         if (!attemptWorldHop(bankWorld2, "banking hop 2")) {
             return; // Stay in this state to retry
         }
-        currentState = ObstacleState.WALK_TO_LEVER;
+        sleep(2000); // Wait for hop to complete
+
+        // Join FC on second hop (after banking)
+        if (config.joinFc() && !isInFriendChat()) {
+            joinFriendChat();
+            sleep(1000); // Wait for FC join to complete
+        }
+
+        // After hopping to world 2 and joining FC, go to post-bank config
+        currentState = ObstacleState.POST_BANK_CONFIG;
     }
 
     private void handleSwapBack() {
@@ -5360,7 +5374,14 @@ public final class WildernessNickyScript extends Script {
         }
 
         // Continue to next state
-        currentState = ObstacleState.POST_BANK_CONFIG;
+        // If world hopping is enabled, hop to world 2 and rejoin FC
+        // Otherwise, go directly to post-bank config
+        if (config.enableWorldHop() && bankWorld2 > 0) {
+            Microbot.log("[WildernessNicky] Banking complete - hopping to world 2 and rejoining FC");
+            currentState = ObstacleState.WORLD_HOP_2;
+        } else {
+            currentState = ObstacleState.POST_BANK_CONFIG;
+        }
     }
 
     private void attemptLogoutUntilLoggedOut() {

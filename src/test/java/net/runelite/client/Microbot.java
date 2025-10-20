@@ -12,6 +12,7 @@ import net.runelite.client.plugins.microbot.example.ExamplePlugin;
 import net.runelite.client.plugins.microbot.wildernessnicky.WildernessNickyPlugin;
 import net.runelite.client.plugins.microbot.qualityoflife.QoLPlugin;
 import net.runelite.client.plugins.microbot.playermonitor.PlayerMonitorPlugin;
+import net.runelite.client.plugins.microbot.pvprl.PvpRLPlugin;
 
 public class Microbot
 {
@@ -19,7 +20,8 @@ public class Microbot
 	private static final Class<?>[] debugPlugins = {
             WildernessNickyPlugin.class,
             QoLPlugin.class,
-            PlayerMonitorPlugin.class
+            PlayerMonitorPlugin.class,
+            PvpRLPlugin.class
 	};
 
     public static void main(String[] args) throws Exception
