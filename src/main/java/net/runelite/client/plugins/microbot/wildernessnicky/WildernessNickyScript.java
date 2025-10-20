@@ -3604,38 +3604,37 @@ public final class WildernessNickyScript extends Script {
         if (currentHealth < previousHealth) {
             int healthDrop = previousHealth - currentHealth;
 
-            // Check if we're in combat with another player
+            // Check if we're in combat with another player (NOT skeleton/NPC)
             Actor interactingWith = Microbot.getClient().getLocalPlayer().getInteracting();
             boolean inPlayerCombat = (interactingWith instanceof Player);
 
-            // Heuristic: Large health drops (>10%) OR being in player combat = PvP damage
-            // Agility fails typically do smaller, predictable damage
-            if (healthDrop >= 10 || inPlayerCombat) {
+            // IMPORTANT: Only count as PvP hit if we're actually fighting a PLAYER
+            // Skeletons/NPCs should NOT count toward hit thresholds
+            // Large health drops (>10%) alone are NOT enough - must confirm it's from a player
+            if (inPlayerCombat && interactingWith != null) {
+                // Confirmed player combat - count this hit
                 pvpHitCount++;
                 recentlyTookPvPDamage = true;
                 lastPvPDamageTime = currentTime;
 
-                // NEW: Track if attacker is clan member or not
-                if (inPlayerCombat && interactingWith != null) {
-                    Player attacker = (Player) interactingWith;
-                    String attackerName = attacker.getName();
-                    lastAttackerName = attackerName != null ? attackerName : "";
+                Player attacker = (Player) interactingWith;
+                String attackerName = attacker.getName();
+                lastAttackerName = attackerName != null ? attackerName : "";
 
-                    // Check if attacker is in our FC/clan
-                    boolean isAttackerClanMember = isPlayerInClan(attackerName);
+                // Check if attacker is in our FC/clan
+                boolean isAttackerClanMember = isPlayerInClan(attackerName);
 
-                    if (isAttackerClanMember) {
-                        clanMemberHitCount++;
-                        Microbot.log("[WildernessNicky] ⚔️ Clan Member Hit #" + clanMemberHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
-                    } else {
-                        nonClanHitCount++;
-                        Microbot.log("[WildernessNicky] ⚔️ NON-CLAN Hit #" + nonClanHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
-                    }
+                if (isAttackerClanMember) {
+                    clanMemberHitCount++;
+                    Microbot.log("[WildernessNicky] ⚔️ Clan Member Hit #" + clanMemberHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
                 } else {
-                    // Unknown attacker, assume non-clan for safety
                     nonClanHitCount++;
-                    Microbot.log("[WildernessNicky] ⚔️ PvP Hit #" + pvpHitCount + " Detected! Health dropped " + healthDrop + "%");
+                    Microbot.log("[WildernessNicky] ⚔️ NON-CLAN Hit #" + nonClanHitCount + " from " + attackerName + " (Health -" + healthDrop + "%)");
                 }
+            } else if (healthDrop >= 10) {
+                // Large health drop but not from a player (skeleton, agility fail, etc.)
+                // Don't count toward PvP hit threshold, but log it for debugging
+                Microbot.log("[WildernessNicky] ❤️ Health drop detected: -" + healthDrop + "% (Not from player - skeleton/agility fail)");
             }
         }
 
