@@ -174,6 +174,26 @@ public interface WildernessNickyConfig extends Config {
     }
 
     @ConfigItem(
+        keyName = "massHopWorlds",
+        name = "  🌍 Mass Hop Worlds (Custom)",
+        description = "<html><b>MASS MODE ONLY:</b><br>Comma-separated world numbers to hop between (e.g., 416,417,418).<br>Leave empty to use dropdown selection above.<br><b>This overrides the dropdown if set!</b></html>",
+        position = 17,
+        section = escapeSection,
+        hidden = true
+    )
+    default String massHopWorlds() { return ""; }
+
+    @ConfigItem(
+        keyName = "massHopWorldsVisible",
+        name = "",
+        description = "",
+        hidden = true
+    )
+    default boolean massHopWorldsVisible() {
+        return playMode() == PlayMode.MASS;
+    }
+
+    @ConfigItem(
         keyName = "massReloginDelayMin",
         name = "  ⏱️ Relogin Delay Min (sec)",
         description = "<html><b>MASS MODE ONLY:</b><br>Minimum seconds to wait before re-logging after logout from attack.<br>Default: 30 seconds</html>",
@@ -216,6 +236,15 @@ public interface WildernessNickyConfig extends Config {
     }
 
     @ConfigItem(
+        keyName = "soloHopWorlds",
+        name = "🌍 Solo Hop Worlds",
+        description = "<html><b>SOLO MODE ONLY:</b><br>Comma-separated world numbers to hop to after logout (e.g., 301,302,303,304,305).<br>Script will cycle through this list when escaping from PKers.<br>Leave empty for random world selection.</html>",
+        position = 19,
+        section = escapeSection
+    )
+    default String soloHopWorlds() { return ""; }
+
+    @ConfigItem(
         keyName = "enableProactivePlayerDetection",
         name = "🔍 Proactive PKer Detection",
         description = "<html>Scan for PKers every 5 seconds.<br>Escape BEFORE being attacked if threatening player within 15 tiles.<br><b>Note:</b> Disabled in Mass Mode (uses hit detection instead)</html>",
@@ -234,6 +263,34 @@ public interface WildernessNickyConfig extends Config {
         section = escapeSection
     )
     default boolean useProjectilePrayerSwitching() { return true; }
+
+    // === WIKI SAFE ZONE COORDINATES ===
+    @ConfigItem(
+        keyName = "iceWarriorsSafeSpot",
+        name = "🧊 Ice Warriors Safe Spot",
+        description = "<html><b>Ice Warriors Zone (West Route):</b><br>WorldPoint coordinates for safe logout spot (format: X,Y,Z).<br>Default: 2970,3940,0<br>Use RuneLite tile marker to find exact coordinates.</html>",
+        position = 21,
+        section = escapeSection
+    )
+    default String iceWarriorsSafeSpot() { return "2970,3940,0"; }
+
+    @ConfigItem(
+        keyName = "piratesSafeSpot",
+        name = "🏴‍☠️ Pirates' Hideout Safe Spot",
+        description = "<html><b>Pirates' Hideout (East Route):</b><br>WorldPoint coordinates for safe logout spot (format: X,Y,Z).<br>Default: 3045,3960,0<br>Requires lockpick to enter.</html>",
+        position = 22,
+        section = escapeSection
+    )
+    default String piratesSafeSpot() { return "3045,3960,0"; }
+
+    @ConfigItem(
+        keyName = "dungeonSafeSpot",
+        name = "🕳️ Deep Dungeon Safe Spot",
+        description = "<html><b>Deep Wilderness Dungeon (East Route):</b><br>WorldPoint coordinates for underground safe spot (format: X,Y,Z).<br>Default: 3045,10325,0 (Z=0 for underground)<br>Requires Wilderness Medium Diary.</html>",
+        position = 23,
+        section = escapeSection
+    )
+    default String dungeonSafeSpot() { return "3045,10325,0"; }
 
     // === Looting Settings ===
     @ConfigSection(

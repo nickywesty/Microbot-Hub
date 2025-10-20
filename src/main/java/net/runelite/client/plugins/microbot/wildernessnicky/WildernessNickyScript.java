@@ -17,6 +17,7 @@ import net.runelite.client.plugins.microbot.*;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.microbot.util.bank.Rs2Bank;
 import net.runelite.client.plugins.microbot.util.inventory.*;
+import net.runelite.client.plugins.microbot.util.npc.Rs2Npc;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
@@ -80,6 +81,43 @@ public final class WildernessNickyScript extends Script {
     private static final int FALLING_ANIMATION = 7155; // Animation ID when player falls from obstacle
     private static final WorldPoint START_POINT = new WorldPoint(3004, 3936, 0);
     private static final WorldPoint DISPENSER_POINT = new WorldPoint(3004, 3936, 0);
+
+    // Skeleton escape zone constants
+    private static final int LADDER_OBJECT_ID = 17385; // Pit ladder (go underground to break combat)
+    private static final WorldPoint LADDER_AREA = new WorldPoint(3004, 3950, 0); // Approx ladder location
+    private static final WorldPoint ROCK_EXIT_POINT = new WorldPoint(2995, 3945, 0); // Exit rock area to break aggro
+
+    // ===== WIKI SAFE ZONE ESCAPE ROUTES =====
+    // Safe Zone 1: Frozen Waste Plateau (Ice Warriors/Giants) - WEST route
+    private static final WorldPoint ICE_WARRIOR_ZONE = new WorldPoint(2978, 3935, 0); // West gate area
+    private static final int WEST_GATE_ID = 26760; // West gate from course
+    private static final WorldPoint ICE_WARRIOR_SAFE_SPOT = new WorldPoint(2970, 3940, 0); // Deep in ice warrior zone
+
+    // Safe Zone 2: Pirates' Hideout - EAST route (requires lockpick)
+    private static final WorldPoint PIRATES_HIDEOUT = new WorldPoint(3038, 3958, 0); // Pirates hideout entrance
+    private static final int LOCKPICK_ID = 1523;
+    private static final WorldPoint PIRATES_SAFE_SPOT = new WorldPoint(3045, 3960, 0); // Inside hideout
+
+    // Safe Zone 3: Deep Wilderness Dungeon - EAST route (requires diary)
+    private static final WorldPoint DEEP_WILDY_DUNGEON = new WorldPoint(3044, 3927, 0); // Dungeon entrance
+    private static final WorldPoint DUNGEON_SAFE_SPOT = new WorldPoint(3045, 10325, 0); // Inside dungeon (underground)
+    private static final int WILDY_MEDIUM_DIARY_VARBIT = 4500; // Wilderness Medium Diary completion
+
+    // Safe Zone 4: Mage Bank - CURRENT route (requires knife/slash weapon)
+    // Already defined in phoenixEscape constants
+
+    // Escape route tracking
+    private enum EscapeRoute {
+        SKELETON_AGGRO,      // Use skeletons in course as protection
+        ICE_WARRIORS,        // West to Frozen Waste Plateau
+        PIRATES_HIDEOUT,     // East to Pirates (needs lockpick)
+        DEEP_DUNGEON,        // East to dungeon (needs diary)
+        MAGE_BANK           // East to Mage Bank (current route)
+    }
+
+    private EscapeRoute selectedEscapeRoute = null;
+    private boolean hasReachedSafeZone = false;
+    private long safeZoneReachedTime = 0;
 
     // --- Config & Plugin ---
     private WildernessNickyConfig config;
@@ -149,7 +187,9 @@ public final class WildernessNickyScript extends Script {
         SWAP_BACK,
         PIT_RECOVERY,
         EMERGENCY_ESCAPE,
-        GE_BUY_LOOTING_BAG  // Death recovery - buy new looting bag from GE
+        GE_BUY_LOOTING_BAG,  // Death recovery - buy new looting bag from GE
+        GE_BUY_NOTED_LOOTING_BAG,  // Startup - buy noted looting bag from GE
+        UNNOTE_LOOTING_BAG  // Startup - unnote looting bag at bank with RoW
     }
     private ObstacleState currentState = ObstacleState.START;
     private ObstacleState pitRecoveryTarget = null;
@@ -162,6 +202,8 @@ public final class WildernessNickyScript extends Script {
     private boolean forceBankNextLoot = false;
     private boolean forceStartAtCourse = false;
     private boolean needsToBuyLootingBag = false; // Set true after death
+    private boolean needsToBuyNotedLootingBag = false; // Set true if no looting bag in bank on startup
+    private boolean hasWithdrawnRingOfWealth = false; // Track RoW withdrawal for unnoting
     private int originalWorld = -1;
     private int bankWorld1 = -1;
     private int bankWorld2 = -1;
@@ -256,6 +298,39 @@ public final class WildernessNickyScript extends Script {
     private boolean isTeleBlocked = false;
     private long teleBlockDetectedTime = 0;
 
+    // ===== ENHANCED ANTI-PK SYSTEM =====
+    // PKer equipment tracking for smarter prayer prediction
+    private Map<String, Integer> pkerWeaponCache = new ConcurrentHashMap<>();
+    private Map<String, Integer> pkerCapeCache = new ConcurrentHashMap<>();
+    private long lastEquipmentScanTime = 0;
+    private static final long EQUIPMENT_SCAN_INTERVAL = 600; // Scan every tick
+
+    // Freeze detection (entangle, ice barrage, etc.)
+    private boolean isFrozen = false;
+    private long freezeStartTime = 0;
+    private static final long FREEZE_MAX_DURATION = 20000; // 20 seconds max freeze
+
+    // Gap closing detection (PKer rushing)
+    private Map<String, Integer> pkerLastDistance = new ConcurrentHashMap<>();
+    private Map<String, Long> pkerRushDetectionTime = new ConcurrentHashMap<>();
+    private static final int RUSH_DISTANCE_THRESHOLD = 5; // If PKer closes 5+ tiles in 2 seconds
+    private static final long RUSH_DETECTION_WINDOW = 2000; // 2 second window
+
+    // Multi-PKer panic mode
+    private Set<String> nearbyPkers = new HashSet<>();
+    private long lastPanicModeCheck = 0;
+    private static final long PANIC_MODE_CHECK_INTERVAL = 1000; // Check every second
+    private static final int PANIC_MODE_PKER_THRESHOLD = 2; // 2+ PKers = panic
+
+    // Combat state tracking (using Rs2Combat API)
+    private boolean wasInCombatLastTick = false;
+    private long lastCombatStateChangeTime = 0;
+
+    // Attack range calculation constants
+    private static final int BARRAGE_RANGE = 10;
+    private static final int MSB_RANGE = 10;
+    private static final int MELEE_RANGE = 1;
+
     // Combat tracking
     private long lastCombatActionTime = 0;
     private static final long COMBAT_TIMEOUT = 10000; // 10 seconds
@@ -332,6 +407,647 @@ public final class WildernessNickyScript extends Script {
     @Getter
     private long lastEscapeTime = 0;
 
+    // ===== CUSTOM WORLD LIST TRACKING =====
+    private List<Integer> parsedSoloWorlds = new ArrayList<>();
+    private List<Integer> parsedMassWorlds = new ArrayList<>();
+    private int currentSoloWorldIndex = 0;
+    private int currentMassWorldIndex = 0;
+
+    // =============================================================================
+    // WORLD PARSING AND VALIDATION HELPERS
+    // =============================================================================
+
+    /**
+     * Parses a comma-separated string of world numbers into a validated list.
+     * Filters out invalid worlds (Deadman, Tournament, skill total, etc.)
+     *
+     * @param worldString Comma-separated world numbers (e.g., "301,302,303")
+     * @return List of valid world numbers
+     */
+    private List<Integer> parseAndValidateWorlds(String worldString) {
+        List<Integer> validWorlds = new ArrayList<>();
+
+        if (worldString == null || worldString.trim().isEmpty()) {
+            return validWorlds;
+        }
+
+        // Split by comma and parse
+        String[] worldTokens = worldString.split(",");
+        for (String token : worldTokens) {
+            try {
+                int worldNum = Integer.parseInt(token.trim());
+
+                // Validate world number range (300-600)
+                if (worldNum < 300 || worldNum > 600) {
+                    Microbot.log("[WildernessNicky] ⚠️ Invalid world number: " + worldNum + " (must be 300-600)");
+                    continue;
+                }
+
+                // Check if world is valid (not Deadman, Tournament, etc.)
+                if (isValidWorld(worldNum)) {
+                    validWorlds.add(worldNum);
+                } else {
+                    Microbot.log("[WildernessNicky] ⚠️ Skipping invalid/restricted world: " + worldNum);
+                }
+            } catch (NumberFormatException e) {
+                Microbot.log("[WildernessNicky] ⚠️ Invalid world format: " + token);
+            }
+        }
+
+        return validWorlds;
+    }
+
+    /**
+     * Validates if a world number is a valid OSRS world
+     * Simple validation - checks if world is in valid range
+     *
+     * @param worldNum World number to validate
+     * @return true if world is valid for regular play
+     */
+    private boolean isValidWorld(int worldNum) {
+        // Basic validation: world number must be between 300-600
+        // This covers all regular OSRS worlds
+        // Excludes special worlds (Deadman, Tournament, etc.) which are typically outside this range
+        return worldNum >= 300 && worldNum <= 600;
+    }
+
+    /**
+     * Gets the next world from the solo hop world list (cycling through)
+     *
+     * @return Next valid world number, or -1 if no worlds configured
+     */
+    private int getNextSoloWorld() {
+        if (parsedSoloWorlds.isEmpty()) {
+            return -1;
+        }
+
+        int world = parsedSoloWorlds.get(currentSoloWorldIndex);
+        currentSoloWorldIndex = (currentSoloWorldIndex + 1) % parsedSoloWorlds.size();
+
+        return world;
+    }
+
+    /**
+     * Gets the next world from the mass hop world list (cycling through)
+     *
+     * @return Next valid world number, or -1 if no worlds configured
+     */
+    private int getNextMassWorld() {
+        if (parsedMassWorlds.isEmpty()) {
+            return -1;
+        }
+
+        int world = parsedMassWorlds.get(currentMassWorldIndex);
+        currentMassWorldIndex = (currentMassWorldIndex + 1) % parsedMassWorlds.size();
+
+        return world;
+    }
+
+    /**
+     * Parses WorldPoint coordinates from config string (format: "X,Y,Z")
+     *
+     * @param coordString Coordinate string from config (e.g., "2970,3940,0")
+     * @param defaultPoint Fallback WorldPoint if parsing fails
+     * @return Parsed WorldPoint or default if invalid
+     */
+    private WorldPoint parseWorldPoint(String coordString, WorldPoint defaultPoint) {
+        if (coordString == null || coordString.trim().isEmpty()) {
+            return defaultPoint;
+        }
+
+        try {
+            String[] parts = coordString.trim().split(",");
+            if (parts.length != 3) {
+                Microbot.log("[WildernessNicky] ⚠️ Invalid coordinate format (expected X,Y,Z): " + coordString);
+                return defaultPoint;
+            }
+
+            int x = Integer.parseInt(parts[0].trim());
+            int y = Integer.parseInt(parts[1].trim());
+            int z = Integer.parseInt(parts[2].trim());
+
+            // Basic validation
+            if (x < 0 || y < 0 || z < 0 || z > 3) {
+                Microbot.log("[WildernessNicky] ⚠️ Invalid coordinate values: " + coordString);
+                return defaultPoint;
+            }
+
+            return new WorldPoint(x, y, z);
+        } catch (NumberFormatException e) {
+            Microbot.log("[WildernessNicky] ⚠️ Failed to parse coordinates: " + coordString);
+            return defaultPoint;
+        }
+    }
+
+    // =============================================================================
+    // ENHANCED ANTI-PK DETECTION SYSTEM
+    // =============================================================================
+
+    /**
+     * Detects PKer's primary attack style based on equipped weapon and gear.
+     * Used for predictive prayer switching before projectiles are even fired.
+     *
+     * @param pker The player to analyze
+     * @return Recommended protection prayer, or null if unknown
+     */
+    private Rs2PrayerEnum detectPkerThreatType(Player pker) {
+        if (pker == null || pker.getPlayerComposition() == null) {
+            return null;
+        }
+
+        String pkerName = pker.getName();
+        int weapon = pker.getPlayerComposition().getEquipmentId(KitType.WEAPON);
+        int cape = pker.getPlayerComposition().getEquipmentId(KitType.CAPE);
+
+        // Cache equipment for tracking changes
+        pkerWeaponCache.put(pkerName, weapon);
+        pkerCapeCache.put(pkerName, cape);
+
+        // MAGIC DETECTION (highest priority - most dangerous in wildy)
+        // Toxic staff of the dead / Staff of the dead / Kodai wand
+        if (weapon == 12904 || weapon == 11791 || weapon == 21006) {
+            return Rs2PrayerEnum.PROTECT_MAGIC;
+        }
+
+        // RANGED DETECTION
+        // Webweaver bow / Zaryte crossbow / Toxic blowpipe / Magic shortbow / Dark bow
+        if (weapon == 27219 || weapon == 26374 || weapon == 12926 || weapon == 861 || weapon == 11235) {
+            return Rs2PrayerEnum.PROTECT_RANGE;
+        }
+
+        // MELEE DETECTION (look for melee-specific indicators)
+        // Infernal cape (99% melee) or Fire cape + melee weapon
+        if (cape == 21282 || cape == 13342) {
+            // AGS / Voidwaker / Dragon claws / Dragon dagger / Saradomin sword
+            int[] meleeWeapons = {11802, 27690, 13652, 1215, 11730};
+            for (int meleeWeap : meleeWeapons) {
+                if (weapon == meleeWeap) {
+                    return Rs2PrayerEnum.PROTECT_MELEE;
+                }
+            }
+        }
+
+        return null; // Unknown - rely on projectile detection
+    }
+
+    /**
+     * Checks if player is currently frozen (entangle, ice barrage, etc.)
+     * Detects freeze by checking for movement restriction graphics
+     *
+     * @return true if frozen
+     */
+    private boolean checkIfFrozen() {
+        Player localPlayer = Microbot.getClient().getLocalPlayer();
+        if (localPlayer == null) {
+            return false;
+        }
+
+        // Check for freeze graphics (ice barrage = 369, entangle = 179, snare = 178, bind = 181)
+        int[] freezeGraphics = {369, 179, 178, 181};
+        int currentGraphic = localPlayer.getGraphic();
+
+        for (int freezeGraphic : freezeGraphics) {
+            if (currentGraphic == freezeGraphic) {
+                if (!isFrozen) {
+                    isFrozen = true;
+                    freezeStartTime = System.currentTimeMillis();
+                    Microbot.log("[WildernessNicky] ❄️ FROZEN DETECTED! Graphic: " + currentGraphic);
+                }
+                return true;
+            }
+        }
+
+        // Auto-expire freeze after max duration
+        if (isFrozen && (System.currentTimeMillis() - freezeStartTime) > FREEZE_MAX_DURATION) {
+            isFrozen = false;
+            Microbot.log("[WildernessNicky] ❄️ Freeze expired");
+        }
+
+        return isFrozen;
+    }
+
+    /**
+     * Detects if a PKer is gap-closing (rushing toward player)
+     * Tracks distance changes over time to detect aggressive movement
+     *
+     * @param pker The player to check
+     * @return true if PKer is rushing (closing 5+ tiles in 2 seconds)
+     */
+    private boolean isPkerRushing(Player pker) {
+        if (pker == null) {
+            return false;
+        }
+
+        String pkerName = pker.getName();
+        WorldPoint pkerLoc = pker.getWorldLocation();
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+
+        if (pkerLoc == null || myLoc == null) {
+            return false;
+        }
+
+        int currentDistance = myLoc.distanceTo(pkerLoc);
+
+        // Check if we have previous distance data
+        if (pkerLastDistance.containsKey(pkerName)) {
+            int lastDistance = pkerLastDistance.get(pkerName);
+            long lastCheckTime = pkerRushDetectionTime.getOrDefault(pkerName, 0L);
+            long timeSinceLastCheck = System.currentTimeMillis() - lastCheckTime;
+
+            // If distance decreased by 5+ tiles within 2 seconds = RUSH
+            if (timeSinceLastCheck <= RUSH_DETECTION_WINDOW) {
+                int distanceClosed = lastDistance - currentDistance;
+                if (distanceClosed >= RUSH_DISTANCE_THRESHOLD) {
+                    Microbot.log("[WildernessNicky] 🏃 RUSH DETECTED: " + pkerName + " closed " + distanceClosed + " tiles!");
+                    return true;
+                }
+            }
+        }
+
+        // Update tracking
+        pkerLastDistance.put(pkerName, currentDistance);
+        pkerRushDetectionTime.put(pkerName, System.currentTimeMillis());
+
+        return false;
+    }
+
+    /**
+     * Checks if we should activate PANIC MODE (multiple PKers detected)
+     * Panic mode = instant logout, no hesitation
+     *
+     * @return true if panic mode should activate
+     */
+    private boolean shouldActivatePanicMode() {
+        long currentTime = System.currentTimeMillis();
+
+        // Only check every second to reduce overhead
+        if (currentTime - lastPanicModeCheck < PANIC_MODE_CHECK_INTERVAL) {
+            return nearbyPkers.size() >= PANIC_MODE_PKER_THRESHOLD;
+        }
+
+        lastPanicModeCheck = currentTime;
+        nearbyPkers.clear();
+
+        // Scan for attackable players within threat radius
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return false;
+        }
+
+        List<Player> players = Microbot.getClient().getPlayers();
+        if (players == null) {
+            return false;
+        }
+
+        for (Player player : players) {
+            if (player == null || player == Microbot.getClient().getLocalPlayer()) {
+                continue;
+            }
+
+            WorldPoint pLoc = player.getWorldLocation();
+            if (pLoc == null) {
+                continue;
+            }
+
+            // Check if within threat radius and attackable
+            if (pLoc.distanceTo(myLoc) <= THREAT_SCAN_RADIUS) {
+                if (Rs2Pvp.isAttackable(player)) {
+                    nearbyPkers.add(player.getName());
+                }
+            }
+        }
+
+        boolean panicMode = nearbyPkers.size() >= PANIC_MODE_PKER_THRESHOLD;
+        if (panicMode) {
+            Microbot.log("[WildernessNicky] 🚨 PANIC MODE: " + nearbyPkers.size() + " PKers detected!");
+        }
+
+        return panicMode;
+    }
+
+    /**
+     * Calculates if a PKer is within attack range based on their weapon type
+     *
+     * @param pker The player to check
+     * @return true if PKer can attack from current distance
+     */
+    private boolean isPkerInAttackRange(Player pker) {
+        if (pker == null) {
+            return false;
+        }
+
+        WorldPoint pkerLoc = pker.getWorldLocation();
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+
+        if (pkerLoc == null || myLoc == null) {
+            return false;
+        }
+
+        int distance = myLoc.distanceTo(pkerLoc);
+
+        // Get cached weapon to determine range
+        String pkerName = pker.getName();
+        Integer weapon = pkerWeaponCache.get(pkerName);
+
+        // If we don't know weapon, assume max range (barrage/range)
+        if (weapon == null) {
+            return distance <= BARRAGE_RANGE;
+        }
+
+        // Magic weapons (barrage range = 10)
+        if (weapon == 12904 || weapon == 11791 || weapon == 21006) {
+            return distance <= BARRAGE_RANGE;
+        }
+
+        // Ranged weapons (MSB/crossbow range = 10)
+        if (weapon == 27219 || weapon == 26374 || weapon == 12926 || weapon == 861) {
+            return distance <= MSB_RANGE;
+        }
+
+        // Melee weapons (range = 1, or 2 with halberd)
+        return distance <= MELEE_RANGE;
+    }
+
+    /**
+     * Enhanced combat state detection using Rs2Combat API
+     * More reliable than manual checks
+     *
+     * @return true if in combat
+     */
+    private boolean isInCombatEnhanced() {
+        boolean inCombat = Rs2Combat.inCombat();
+
+        // Track combat state changes
+        if (inCombat != wasInCombatLastTick) {
+            wasInCombatLastTick = inCombat;
+            lastCombatStateChangeTime = System.currentTimeMillis();
+
+            if (inCombat) {
+                Microbot.log("[WildernessNicky] ⚔️ Entered combat!");
+            } else {
+                Microbot.log("[WildernessNicky] ✅ Exited combat");
+            }
+        }
+
+        return inCombat;
+    }
+
+    // =============================================================================
+    // WIKI SAFE ZONE ESCAPE SYSTEM
+    // =============================================================================
+
+    /**
+     * Selects the best escape route based on:
+     * 1. Player position (closest route)
+     * 2. Inventory requirements (lockpick, knife)
+     * 3. Diary completion (for dungeon shortcut)
+     *
+     * @return Best escape route for current situation
+     */
+    private EscapeRoute selectBestEscapeRoute() {
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return EscapeRoute.MAGE_BANK; // Default fallback
+        }
+
+        // Check inventory requirements
+        boolean hasLockpick = Rs2Inventory.hasItem(LOCKPICK_ID);
+        boolean hasKnife = Rs2Inventory.hasItem(KNIFE_ID) || Rs2Equipment.isWearing("Knife");
+        boolean hasSlashWeapon = hasKnife; // Simplified - knife is most common
+        boolean hasDiary = Microbot.getVarbitValue(WILDY_MEDIUM_DIARY_VARBIT) == 1;
+
+        // Calculate distances to each safe zone
+        int distToIceWarriors = myLoc.distanceTo(ICE_WARRIOR_ZONE);
+        int distToPirates = myLoc.distanceTo(PIRATES_HIDEOUT);
+        int distToDungeon = myLoc.distanceTo(DEEP_WILDY_DUNGEON);
+        int distToMageBank = myLoc.distanceTo(new WorldPoint(3090, 3960, 0)); // Mage bank approx
+
+        Microbot.log("[WildernessNicky] 🗺️ Escape Route Distances:");
+        Microbot.log("  Ice Warriors (West): " + distToIceWarriors + " tiles");
+        Microbot.log("  Pirates (East, lockpick=" + hasLockpick + "): " + distToPirates + " tiles");
+        Microbot.log("  Dungeon (East, diary=" + hasDiary + "): " + distToDungeon + " tiles");
+        Microbot.log("  Mage Bank (East, slash=" + hasSlashWeapon + "): " + distToMageBank + " tiles");
+
+        // Priority 1: SKELETON_AGGRO if already near skeletons in course
+        WorldArea courseArea = new WorldArea(SOUTH_WEST_CORNER, ROCK_AREA_WIDTH, ROCK_AREA_HEIGHT);
+        if (courseArea.contains(myLoc)) {
+            Microbot.log("[WildernessNicky] 💀 Using SKELETON AGGRO strategy (inside course)");
+            return EscapeRoute.SKELETON_AGGRO;
+        }
+
+        // Priority 2: ICE_WARRIORS (closest and no requirements)
+        if (distToIceWarriors <= 25) {
+            Microbot.log("[WildernessNicky] ❄️ Using ICE WARRIORS route (closest, no requirements)");
+            return EscapeRoute.ICE_WARRIORS;
+        }
+
+        // Priority 3: PIRATES (if has lockpick and closer than others)
+        if (hasLockpick && distToPirates < distToMageBank && distToPirates < distToDungeon) {
+            Microbot.log("[WildernessNicky] 🏴‍☠️ Using PIRATES HIDEOUT route (has lockpick)");
+            return EscapeRoute.PIRATES_HIDEOUT;
+        }
+
+        // Priority 4: DUNGEON (if has diary and close)
+        if (hasDiary && distToDungeon < distToMageBank) {
+            Microbot.log("[WildernessNicky] 🕳️ Using DEEP DUNGEON route (has diary)");
+            return EscapeRoute.DEEP_DUNGEON;
+        }
+
+        // Priority 5: MAGE_BANK (default, works for everyone)
+        Microbot.log("[WildernessNicky] 🏦 Using MAGE BANK route (default)");
+        return EscapeRoute.MAGE_BANK;
+    }
+
+    // NOTE: isInSafeZone() method defined later in file (line ~3265)
+    // Removed duplicate definition here to fix compilation error
+
+    /**
+     * Executes the selected escape route
+     * Each route navigates to NPC-dense areas for protection
+     */
+    private void executeEscapeRoute() {
+        if (selectedEscapeRoute == null) {
+            selectedEscapeRoute = selectBestEscapeRoute();
+        }
+
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return;
+        }
+
+        switch (selectedEscapeRoute) {
+            case SKELETON_AGGRO:
+                executeSkeletonAggroRoute();
+                break;
+
+            case ICE_WARRIORS:
+                executeIceWarriorsRoute();
+                break;
+
+            case PIRATES_HIDEOUT:
+                executePiratesRoute();
+                break;
+
+            case DEEP_DUNGEON:
+                executeDungeonRoute();
+                break;
+
+            case MAGE_BANK:
+                // Already handled by phoenixEscape logic
+                // This fallback is if other routes fail
+                break;
+        }
+    }
+
+    /**
+     * SKELETON AGGRO Route: Stay in course, deliberately get skeleton aggro
+     * Wiki: "Try to get NPCs to attack you in single-combat area"
+     */
+    private void executeSkeletonAggroRoute() {
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return;
+        }
+
+        // If already have skeleton aggro, we're safe!
+        if (isInSkeletonCombat()) {
+            Microbot.log("[WildernessNicky] 💀 Skeleton is protecting us - attempting logout");
+            Rs2Player.logout();
+            sleep(100);
+            return;
+        }
+
+        // Move to skeleton-dense area (near ladder/rocks)
+        if (myLoc.distanceTo(LADDER_AREA) > 3) {
+            Microbot.log("[WildernessNicky] 💀 Moving to skeleton zone for protection");
+            Rs2Walker.walkTo(LADDER_AREA, 2);
+            sleep(600);
+        }
+
+        // Wait for skeleton to attack (don't break combat this time!)
+        Microbot.log("[WildernessNicky] 💀 Waiting for skeleton aggro...");
+        sleep(1200);
+    }
+
+    /**
+     * ICE WARRIORS Route: West through gate to Frozen Waste Plateau
+     * Wiki: "run west through Frozen Waste Plateau and south through gate"
+     */
+    private void executeIceWarriorsRoute() {
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return;
+        }
+
+        // Parse custom safe spot from config (or use default)
+        WorldPoint targetSafeSpot = parseWorldPoint(config.iceWarriorsSafeSpot(), ICE_WARRIOR_SAFE_SPOT);
+
+        // Step 1: Head west toward gate
+        if (myLoc.distanceTo(ICE_WARRIOR_ZONE) > 5) {
+            Microbot.log("[WildernessNicky] ❄️ Running west to Ice Warrior zone");
+            Rs2Walker.walkTo(ICE_WARRIOR_ZONE, 2);
+            sleep(600);
+            return;
+        }
+
+        // Step 2: Open west gate if needed
+        TileObject westGate = Rs2GameObject.findObjectById(WEST_GATE_ID);
+        if (westGate != null && myLoc.distanceTo(westGate.getWorldLocation()) < 5) {
+            Microbot.log("[WildernessNicky] 🚪 Opening west gate");
+            Rs2GameObject.interact(westGate, "Open");
+            sleep(1200);
+            return;
+        }
+
+        // Step 3: Move to custom ice warrior safe spot
+        if (myLoc.distanceTo(targetSafeSpot) > 3) {
+            Microbot.log("[WildernessNicky] ❄️ Moving to safe spot: " + targetSafeSpot);
+            Rs2Walker.walkTo(targetSafeSpot, 2);
+            sleep(600);
+            return;
+        }
+
+        // Step 4: Wait for ice warrior aggro, then logout
+        if (isInSafeZone()) {
+            Microbot.log("[WildernessNicky] ❄️ Ice Warriors protecting - attempting logout");
+            Rs2Player.logout();
+            sleep(100);
+        }
+    }
+
+    /**
+     * PIRATES Route: East to Pirates' Hideout (requires lockpick)
+     * Wiki: "run east to Pirates' Hideout. This requires a lockpick"
+     */
+    private void executePiratesRoute() {
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return;
+        }
+
+        // Verify we still have lockpick
+        if (!Rs2Inventory.hasItem(LOCKPICK_ID)) {
+            Microbot.log("[WildernessNicky] ⚠️ Lost lockpick - switching to Mage Bank route");
+            selectedEscapeRoute = EscapeRoute.MAGE_BANK;
+            return;
+        }
+
+        // Parse custom safe spot from config (or use default)
+        WorldPoint targetSafeSpot = parseWorldPoint(config.piratesSafeSpot(), PIRATES_SAFE_SPOT);
+
+        // Navigate to custom pirates safe spot
+        if (myLoc.distanceTo(targetSafeSpot) > 3) {
+            Microbot.log("[WildernessNicky] 🏴‍☠️ Running to safe spot: " + targetSafeSpot);
+            Rs2Walker.walkTo(targetSafeSpot, 2);
+            sleep(600);
+            return;
+        }
+
+        // Wait for pirate aggro, then logout
+        if (isInSafeZone()) {
+            Microbot.log("[WildernessNicky] 🏴‍☠️ Pirates protecting - attempting logout");
+            Rs2Player.logout();
+            sleep(100);
+        }
+    }
+
+    /**
+     * DEEP DUNGEON Route: East to Deep Wilderness Dungeon (requires diary)
+     * Wiki: "run east to Deep Wilderness Dungeon. Complete Wilderness Medium Diary"
+     */
+    private void executeDungeonRoute() {
+        WorldPoint myLoc = Rs2Player.getWorldLocation();
+        if (myLoc == null) {
+            return;
+        }
+
+        // Verify we have diary
+        boolean hasDiary = Microbot.getVarbitValue(WILDY_MEDIUM_DIARY_VARBIT) == 1;
+        if (!hasDiary) {
+            Microbot.log("[WildernessNicky] ⚠️ No Wilderness Medium Diary - switching to Mage Bank route");
+            selectedEscapeRoute = EscapeRoute.MAGE_BANK;
+            return;
+        }
+
+        // Parse custom safe spot from config (or use default)
+        WorldPoint targetSafeSpot = parseWorldPoint(config.dungeonSafeSpot(), DUNGEON_SAFE_SPOT);
+
+        // Navigate to custom dungeon safe spot
+        if (myLoc.distanceTo(targetSafeSpot) > 3) {
+            Microbot.log("[WildernessNicky] 🕳️ Running to safe spot: " + targetSafeSpot);
+            Rs2Walker.walkTo(targetSafeSpot, 2);
+            sleep(600);
+            return;
+        }
+
+        // Wait for monster aggro, then logout
+        if (isInSafeZone()) {
+            Microbot.log("[WildernessNicky] 🕳️ Dungeon monsters protecting - attempting logout");
+            Rs2Player.logout();
+            sleep(100);
+        }
+    }
+
     /**
      * Starts the Wilderness Agility script.
      * @param config The script configuration
@@ -346,6 +1062,17 @@ public final class WildernessNickyScript extends Script {
 
         // Initialize startup grace period timer
         scriptStartTime = System.currentTimeMillis();
+
+        // Parse custom world lists
+        parsedSoloWorlds = parseAndValidateWorlds(config.soloHopWorlds());
+        parsedMassWorlds = parseAndValidateWorlds(config.massHopWorlds());
+
+        if (!parsedSoloWorlds.isEmpty()) {
+            Microbot.log("[WildernessNicky] 🌍 Solo Hop Worlds: " + parsedSoloWorlds);
+        }
+        if (!parsedMassWorlds.isEmpty()) {
+            Microbot.log("[WildernessNicky] 🌍 Mass Hop Worlds: " + parsedMassWorlds);
+        }
 
         // Log selected play mode
         Microbot.log("[WildernessNicky] 🎮 Play Mode: " + config.playMode().toString());
@@ -413,8 +1140,8 @@ public final class WildernessNickyScript extends Script {
                             if (Microbot.isLoggedIn()) {
                                 Microbot.log("[WildernessNicky] ✅ Successfully re-logged in!");
 
-                                // Return to mass world if configured
-                                if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random && massWorldToReturn > 0) {
+                                // Return to mass world if configured (custom worlds or dropdown)
+                                if ((!parsedMassWorlds.isEmpty() || config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) && massWorldToReturn > 0) {
                                     int targetWorld = massWorldToReturn;
                                     int currentWorld = Rs2Player.getWorld();
 
@@ -555,7 +1282,12 @@ public final class WildernessNickyScript extends Script {
                             massLogoutLocation = Rs2Player.getWorldLocation();
 
                             // Save mass world if configured
-                            if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+                            if (!parsedMassWorlds.isEmpty()) {
+                                // Use custom mass world list
+                                massWorldToReturn = parsedMassWorlds.get(0); // Always use first world for consistency
+                                Microbot.log("[WildernessNicky] 📌 Will return to custom mass world " + massWorldToReturn + " after re-login");
+                            } else if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+                                // Fallback to dropdown selection
                                 massWorldToReturn = getConfigWorld(config.massWorld());
                                 Microbot.log("[WildernessNicky] 📌 Will return to world " + massWorldToReturn + " after re-login");
                             }
@@ -601,21 +1333,27 @@ public final class WildernessNickyScript extends Script {
                     boolean isPkerCombat = inCombat && (interacting instanceof net.runelite.api.Player);
 
                     if (playerThreat || isPkerCombat) {
-                        // TOUGH IT OUT: Only logout if we have >= 150k GP in looting bag
-                        if (lootingBagValue < 150000) {
-                            String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
-                            Microbot.log("[WildernessNicky] 💪 TOUGHING IT OUT: " + reason + " but only " +
+                        // CRITICAL FIX: If already in PKer combat, ALWAYS escape regardless of GP value
+                        // "Tough it out" logic only applies to nearby threats, not active attacks
+                        if (!isPkerCombat && lootingBagValue < 150000) {
+                            // Only skip escape if it's a NEARBY threat (not attacking yet) and low GP value
+                            Microbot.log("[WildernessNicky] 💪 TOUGHING IT OUT: Attackable player nearby but only " +
                                 NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (need 150k) - continuing");
                             return; // Skip logout, continue running course
                         }
 
                         // REAL PKer THREAT - Need to logout and world hop
+                        // This triggers for: (1) In PKer combat regardless of GP, OR (2) Nearby player with >= 150k GP
                         attemptingLogout = true;
                         logoutAttemptStartTime = System.currentTimeMillis();
 
                         String reason = isPkerCombat ? "In PKer combat" : "Attackable player detected";
                         Microbot.log("[WildernessNicky] ⚠️ " + reason + " - need to logout and world hop!");
-                        Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
+                        if (isPkerCombat) {
+                            Microbot.log("[WildernessNicky] ⚔️ UNDER ATTACK! Escaping regardless of GP value");
+                        } else {
+                            Microbot.log("[WildernessNicky] 💰 Looting bag value: " + NumberFormat.getIntegerInstance().format(lootingBagValue) + " gp (>= 150k threshold)");
+                        }
 
                         // Check if we're in combat with NPCs (skeletons) that prevent logout
                         Actor interactingWith = Microbot.getClient().getLocalPlayer().getInteracting();
@@ -661,14 +1399,27 @@ public final class WildernessNickyScript extends Script {
                                 // Get current world before logout
                                 int currentWorld = Rs2Player.getWorld();
 
-                                // Get a random world (using same approach as PlayerMonitor)
-                                int nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+                                int nextWorld = -1;
 
-                                // Make sure we don't hop to the same world
-                                int attempts = 0;
-                                while (nextWorld == currentWorld && attempts < 10) {
+                                // Try custom world list first
+                                if (!parsedSoloWorlds.isEmpty()) {
+                                    nextWorld = getNextSoloWorld();
+                                    Microbot.log("[WildernessNicky] Using custom solo hop world: " + nextWorld);
+
+                                    // If same world, get next one
+                                    if (nextWorld == currentWorld && parsedSoloWorlds.size() > 1) {
+                                        nextWorld = getNextSoloWorld();
+                                    }
+                                } else {
+                                    // Fallback to random world
                                     nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
-                                    attempts++;
+
+                                    // Make sure we don't hop to the same world
+                                    int attempts = 0;
+                                    while (nextWorld == currentWorld && attempts < 10) {
+                                        nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+                                        attempts++;
+                                    }
                                 }
 
                                 if (nextWorld > 0 && nextWorld != currentWorld) {
@@ -879,6 +1630,8 @@ public final class WildernessNickyScript extends Script {
                     case PIT_RECOVERY: recoverFromPit(); break;
                     case EMERGENCY_ESCAPE: handleEmergencyEscape(); break;
                     case GE_BUY_LOOTING_BAG: handleGEBuyLootingBag(); break;
+                    case GE_BUY_NOTED_LOOTING_BAG: handleGEBuyNotedLootingBag(); break;
+                    case UNNOTE_LOOTING_BAG: handleUnnoteLootingBag(); break;
                 }
                 if (lastObstacleInteractTime > 0 && lastObstaclePosition != null && System.currentTimeMillis() - lastObstacleInteractTime > 2000) {
                     WorldPoint currentPos = Rs2Player.getWorldLocation();
@@ -1783,12 +2536,26 @@ public final class WildernessNickyScript extends Script {
 
         // Withdraw looting bag (if missing)
         if (config.withdrawLootingBag() && !Rs2Inventory.hasItem("Looting bag")) {
-            if (Rs2Bank.hasItem("Looting bag")) {
+            // Check for both unnoted and noted looting bags
+            boolean hasUnnotedBag = Rs2Bank.hasItem(LOOTING_BAG_CLOSED_ID) || Rs2Bank.hasItem(LOOTING_BAG_OPEN_ID);
+            boolean hasNotedBag = Rs2Bank.hasItem("Looting bag (noted)");
+
+            if (hasUnnotedBag) {
                 Microbot.log("[WildernessNicky] Withdrawing looting bag...");
                 Rs2Bank.withdrawOne("Looting bag");
                 sleepUntil(() -> Rs2Inventory.hasItem("Looting bag"), 2000);
+            } else if (hasNotedBag) {
+                // Has noted bag - withdraw it and set flag to unnote later
+                Microbot.log("[WildernessNicky] Found noted looting bag - will unnote after withdrawing RoW");
+                Rs2Bank.withdrawOne("Looting bag (noted)");
+                sleepUntil(() -> Rs2Inventory.hasItem("Looting bag (noted)"), 2000);
+                needsToBuyNotedLootingBag = false; // We have one, just need to unnote
+                // Don't transition yet - we'll handle unnoting after all withdrawals
             } else {
-                Microbot.log("[WildernessNicky] ⚠️ No looting bag found in bank!");
+                // No looting bag at all - need to buy noted version from GE
+                Microbot.log("[WildernessNicky] ⚠️ No looting bag found in bank - will buy noted version from GE!");
+                needsToBuyNotedLootingBag = true;
+                // Will withdraw RoW below for unnoting after GE purchase
             }
         }
 
@@ -1843,6 +2610,49 @@ public final class WildernessNickyScript extends Script {
                     Microbot.log("[WildernessNicky] ⚠️ No " + venomItemName + " found in bank!");
                 }
             }
+        }
+
+        // Withdraw Ring of Wealth if we need to buy or unnote looting bag
+        boolean hasNotedBagInInventory = Rs2Inventory.hasItem("Looting bag (noted)");
+        if ((needsToBuyNotedLootingBag || hasNotedBagInInventory) && !hasWithdrawnRingOfWealth) {
+            // Look for any Ring of Wealth with charges (1-5)
+            String[] rowVariants = {"Ring of wealth (5)", "Ring of wealth (4)", "Ring of wealth (3)", "Ring of wealth (2)", "Ring of wealth (1)"};
+            boolean foundRoW = false;
+
+            for (String rowName : rowVariants) {
+                if (Rs2Bank.hasItem(rowName)) {
+                    Microbot.log("[WildernessNicky] Withdrawing " + rowName + " for unnoting...");
+                    Rs2Bank.withdrawOne(rowName);
+                    sleepUntil(() -> Rs2Inventory.hasItem(rowName), 2000);
+                    hasWithdrawnRingOfWealth = true;
+                    foundRoW = true;
+                    break;
+                }
+            }
+
+            if (!foundRoW) {
+                Microbot.log("[WildernessNicky] ⚠️ No Ring of Wealth found in bank! Cannot unnote looting bag.");
+                Microbot.log("[WildernessNicky] Please add a Ring of Wealth to your bank and restart.");
+                // Close bank and stop - can't proceed without RoW for unnoting
+                Rs2Bank.closeBank();
+                return;
+            }
+        }
+
+        // Determine next state based on looting bag situation
+        if (needsToBuyNotedLootingBag) {
+            // Need to buy noted looting bag from GE first
+            Microbot.log("[WildernessNicky] 🛒 Going to GE to buy noted looting bag...");
+            Rs2Bank.closeBank();
+            sleep(600);
+            currentState = ObstacleState.GE_BUY_NOTED_LOOTING_BAG;
+            return;
+        } else if (hasNotedBagInInventory) {
+            // Have noted bag in inventory - need to unnote it
+            Microbot.log("[WildernessNicky] 📝 Unnoting looting bag...");
+            // Don't close bank yet - unnote handler will handle it
+            currentState = ObstacleState.UNNOTE_LOOTING_BAG;
+            return;
         }
 
         // Close bank
@@ -2871,20 +3681,45 @@ public final class WildernessNickyScript extends Script {
             eatFood();
         }
 
-        // ===== STEP 3: ESCAPE FROM SKELETON COMBAT + SPAM LOGOUT =====
-        // Check if we're in combat with NPCs (skeletons) that prevent logout
-        Actor interactingWith = Microbot.getClient().getLocalPlayer().getInteracting();
-        boolean inSkeletonCombat = interactingWith != null && !(interactingWith instanceof net.runelite.api.Player);
+        // ===== STEP 3: SMART SKELETON COMBAT ESCAPE + SPAM LOGOUT =====
+        // NEW: Multi-zone escape strategy based on player location
+        boolean inSkeletonCombat = isInSkeletonCombat();
 
         if (inSkeletonCombat) {
-            // In skeleton combat - run toward start area to break combat
+            // NEW: Get best escape zone based on current position
+            WorldPoint bestEscapeZone = getBestSkeletonEscapeZone();
             WorldPoint currentLoc = Rs2Player.getWorldLocation();
-            if (currentLoc != null && currentLoc.distanceTo(START_POINT) > 5) {
-                // Far from start - run toward it
-                if (!Rs2Player.isMoving()) {
-                    Microbot.log("[WildernessNicky] 🦴 In skeleton combat - running to safe area (start)");
-                    Rs2Walker.walkTo(START_POINT, 3);
+
+            // If near ladder, try to go down (instant combat break)
+            if (currentLoc != null && currentLoc.distanceTo(LADDER_AREA) < 10) {
+                TileObject ladder = Rs2GameObject.getAll(o -> o.getId() == LADDER_OBJECT_ID, 104)
+                    .stream().findFirst().orElse(null);
+                if (ladder != null && !Rs2Player.isMoving()) {
+                    Microbot.log("[WildernessNicky] 🪜 LADDER ESCAPE: Going underground to break skeleton combat");
+                    Rs2GameObject.interact(ladder, "Climb-down");
+                    sleep(1200); // Wait for climb animation
+                    return; // Let next cycle check if we're underground
                 }
+            }
+
+            // If near gate, try to open and exit (breaks skeleton aggro)
+            if (currentLoc != null && currentLoc.distanceTo(GATE_AREA) < 10) {
+                TileObject gate = Rs2GameObject.getAll(o -> o.getId() == GATE_OBJECT_ID, 104)
+                    .stream().findFirst().orElse(null);
+                if (gate != null && !Rs2Player.isMoving()) {
+                    Microbot.log("[WildernessNicky] 🚪 GATE ESCAPE: Exiting course to break skeleton combat");
+                    Rs2GameObject.interact(gate, "Open");
+                    sleep(600);
+                    // After opening, walk through it
+                    Rs2Walker.walkTo(bestEscapeZone, 2);
+                    return; // Let next cycle continue
+                }
+            }
+
+            // Default: Run to best escape zone
+            if (currentLoc != null && currentLoc.distanceTo(bestEscapeZone) > 3 && !Rs2Player.isMoving()) {
+                Microbot.log("[WildernessNicky] 🦴 Skeleton combat - running to: " + bestEscapeZone);
+                Rs2Walker.walkTo(bestEscapeZone, 2);
             }
         }
 
@@ -2906,13 +3741,27 @@ public final class WildernessNickyScript extends Script {
                 sleep(2000); // Wait 2 seconds before world hop
 
                 int currentWorld = Rs2Player.getWorld();
-                int nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+                int nextWorld = -1;
 
-                // Make sure we don't hop to the same world
-                int attempts = 0;
-                while (nextWorld == currentWorld && attempts < 10) {
+                // Try custom world list first
+                if (!parsedSoloWorlds.isEmpty()) {
+                    nextWorld = getNextSoloWorld();
+                    Microbot.log("[WildernessNicky] Using custom solo hop world: " + nextWorld);
+
+                    // If same world, get next one
+                    if (nextWorld == currentWorld && parsedSoloWorlds.size() > 1) {
+                        nextWorld = getNextSoloWorld();
+                    }
+                } else {
+                    // Fallback to random world
                     nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
-                    attempts++;
+
+                    // Make sure we don't hop to the same world
+                    int attempts = 0;
+                    while (nextWorld == currentWorld && attempts < 10) {
+                        nextWorld = net.runelite.client.plugins.microbot.util.security.Login.getRandomWorld(Rs2Player.isMember());
+                        attempts++;
+                    }
                 }
 
                 if (nextWorld > 0 && nextWorld != currentWorld) {
@@ -2970,6 +3819,20 @@ public final class WildernessNickyScript extends Script {
                 return; // Keep trying logout without moving
             }
         }
+
+        // ===== STEP 5: WIKI SAFE ZONE ROUTING =====
+        // If logout fails after 3 seconds, execute smart escape route to safe zones
+        // These safe zones are NPC-dense areas where PKers have difficulty following
+        // Routes include: Skeleton aggro, Ice Warriors, Pirates' Hideout, Deep Dungeon, Mage Bank
+
+        // Select best escape route if not already chosen
+        if (selectedEscapeRoute == null) {
+            selectedEscapeRoute = selectBestEscapeRoute();
+            Microbot.log("[WildernessNicky] 🗺️ Selected escape route: " + selectedEscapeRoute.name());
+        }
+
+        // Execute escape route (handles movement and logout attempts at safe zones)
+        executeEscapeRoute();
 
         // SAFETY CHECK: Allow escape mode to be cancelled if conditions are met
         // This prevents getting stuck in escape mode forever
@@ -3219,6 +4082,58 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
+     * SKELETON COMBAT DETECTION
+     * Checks if player is currently in combat with a skeleton/NPC
+     * @return true if being attacked by NPC (not player)
+     */
+    private boolean isInSkeletonCombat() {
+        Actor interacting = Microbot.getClient().getLocalPlayer().getInteracting();
+        if (interacting == null) return false;
+
+        // Check if interacting with NPC (not player)
+        return !(interacting instanceof net.runelite.api.Player);
+    }
+
+    /**
+     * BEST SKELETON ESCAPE ZONE
+     * Determines the best escape point based on current location
+     * Priority: Ladder > Gate > Rock Exit > START_POINT
+     * @return WorldPoint to escape to
+     */
+    private WorldPoint getBestSkeletonEscapeZone() {
+        WorldPoint currentPos = Rs2Player.getWorldLocation();
+        if (currentPos == null) return START_POINT;
+
+        // Priority 1: If near ladder (within 10 tiles), go down to underground pit
+        if (currentPos.distanceTo(LADDER_AREA) < 10) {
+            // Check if ladder is actually visible
+            TileObject ladder = Rs2GameObject.getAll(o -> o.getId() == LADDER_OBJECT_ID, 104)
+                .stream().findFirst().orElse(null);
+            if (ladder != null) {
+                Microbot.log("[WildernessNicky] 🪜 Ladder escape available - going underground");
+                return ladder.getWorldLocation();
+            }
+        }
+
+        // Priority 2: If near gate (within 10 tiles), exit through gate
+        if (currentPos.distanceTo(GATE_AREA) < 10) {
+            Microbot.log("[WildernessNicky] 🚪 Gate escape available - exiting course");
+            return GATE_AREA;
+        }
+
+        // Priority 3: If in rock area, run to edge
+        WorldArea rockArea = new WorldArea(SOUTH_WEST_CORNER, ROCK_AREA_WIDTH, ROCK_AREA_HEIGHT);
+        if (rockArea.contains(currentPos)) {
+            Microbot.log("[WildernessNicky] 🏃 Rock area - running to edge");
+            return ROCK_EXIT_POINT;
+        }
+
+        // Priority 4: Default to START_POINT
+        Microbot.log("[WildernessNicky] ⬅️ Default escape - running to start");
+        return START_POINT;
+    }
+
+    /**
      * Resets all escape mode variables to default state
      */
     private void resetEscapeMode() {
@@ -3230,6 +4145,11 @@ public final class WildernessNickyScript extends Script {
         escapeStep2StartTime = 0;
         phoenixEscapeTriggered = false;
         phoenixEscapeStartTime = 0;
+
+        // Reset wiki safe zone escape route tracking
+        selectedEscapeRoute = null;
+        hasReachedSafeZone = false;
+        safeZoneReachedTime = 0;
     }
 
     /**
@@ -3690,6 +4610,175 @@ public final class WildernessNickyScript extends Script {
     }
 
     /**
+     * STARTUP: Buy NOTED looting bag from GE (when no bag in bank)
+     * This is for startup flow only - buys noted version which will be unnoted at bank with RoW
+     */
+    private void handleGEBuyNotedLootingBag() {
+        Microbot.log("[WildernessNicky] 🛒 Starting GE noted looting bag purchase (startup)");
+
+        // Check if we already have a noted looting bag
+        if (Rs2Inventory.hasItem("Looting bag (noted)")) {
+            Microbot.log("[WildernessNicky] ✅ Already have noted looting bag - proceeding to unnote");
+            needsToBuyNotedLootingBag = false;
+            currentState = ObstacleState.UNNOTE_LOOTING_BAG;
+            return;
+        }
+
+        // Step 1: Walk to GE if not there
+        if (!Rs2GrandExchange.isOpen()) {
+            if (!isNearGrandExchange()) {
+                Microbot.log("[WildernessNicky] 🚶 Walking to Grand Exchange");
+                Rs2GrandExchange.walkToGrandExchange();
+                if (!sleepUntil(this::isNearGrandExchange, 30000)) {
+                    Microbot.log("[WildernessNicky] ⚠️ Failed to reach Grand Exchange - will retry");
+                    return;
+                }
+            }
+
+            // Step 2: Open GE
+            Microbot.log("[WildernessNicky] 🏦 Opening Grand Exchange");
+            if (!Rs2GrandExchange.openExchange()) {
+                Microbot.log("[WildernessNicky] ⚠️ Failed to open Grand Exchange - will retry");
+                return;
+            }
+            if (!sleepUntil(Rs2GrandExchange::isOpen, 5000)) {
+                Microbot.log("[WildernessNicky] ⚠️ Grand Exchange did not open - will retry");
+                return;
+            }
+        }
+
+        // Step 3: Calculate buy price (1.15x for fast buy)
+        int lootingBagId = LOOTING_BAG_CLOSED_ID;
+        int basePrice = Rs2GrandExchange.getPrice(lootingBagId);
+
+        if (basePrice <= 0) {
+            basePrice = 10000; // Fallback price
+            Microbot.log("[WildernessNicky] ⚠️ Could not fetch price, using fallback: " + basePrice + " gp");
+        }
+
+        int buyPrice = (int)(basePrice * 1.15);
+        Microbot.log("[WildernessNicky] 💰 Buying NOTED looting bag for " + buyPrice + " gp (base: " + basePrice + " gp)");
+
+        // Step 4: Buy 1x noted looting bag
+        boolean buySuccess = Rs2GrandExchange.buyItem("Looting bag", buyPrice, 1);
+        if (!buySuccess) {
+            Microbot.log("[WildernessNicky] ⚠️ Failed to place buy offer - will retry");
+            Rs2GrandExchange.closeExchange();
+            return;
+        }
+
+        // Step 5: Wait for purchase to complete
+        Microbot.log("[WildernessNicky] ⏳ Waiting for noted looting bag purchase");
+        boolean bought = sleepUntil(Rs2GrandExchange::hasBoughtOffer, 10000);
+
+        if (!bought) {
+            Microbot.log("[WildernessNicky] ⚠️ Purchase timeout - collecting anyway");
+        }
+
+        // Step 6: Collect to inventory (should be noted)
+        Microbot.log("[WildernessNicky] 📦 Collecting noted looting bag");
+        Rs2GrandExchange.collectAllToInventory();
+        sleepUntil(() -> Rs2Inventory.hasItem("Looting bag (noted)"), 3000);
+
+        // Step 7: Close GE
+        Rs2GrandExchange.closeExchange();
+        sleepUntil(() -> !Rs2GrandExchange.isOpen(), 2000);
+
+        // Step 8: Verify we have noted bag
+        if (Rs2Inventory.hasItem("Looting bag (noted)")) {
+            Microbot.log("[WildernessNicky] ✅ Successfully purchased noted looting bag!");
+            needsToBuyNotedLootingBag = false;
+            currentState = ObstacleState.UNNOTE_LOOTING_BAG;
+        } else {
+            Microbot.log("[WildernessNicky] ⚠️ Noted looting bag not in inventory - will retry");
+            // Stay in this state to retry
+        }
+    }
+
+    /**
+     * STARTUP: Unnote the looting bag at bank using Ring of Wealth
+     * Requires Ring of Wealth in inventory (any charges 1-5)
+     */
+    private void handleUnnoteLootingBag() {
+        Microbot.log("[WildernessNicky] 📝 Unnoting looting bag at bank");
+
+        // Check if we already have unnoted looting bag
+        if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID) || Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+            Microbot.log("[WildernessNicky] ✅ Already have unnoted looting bag - continuing startup");
+            currentState = ObstacleState.STARTUP_BANKING; // Go back to banking to finish withdrawals
+            return;
+        }
+
+        // Verify we have noted looting bag
+        if (!Rs2Inventory.hasItem("Looting bag (noted)")) {
+            Microbot.log("[WildernessNicky] ⚠️ No noted looting bag in inventory - going back to banking");
+            currentState = ObstacleState.STARTUP_BANKING;
+            return;
+        }
+
+        // Step 1: Walk to nearest bank if not there
+        if (!Rs2Bank.isNearBank(10)) {
+            Microbot.log("[WildernessNicky] 🚶 Walking to nearest bank for unnoting");
+            Rs2Bank.walkToBank();
+            sleepUntil(() -> Rs2Bank.isNearBank(10), 30000);
+            return;
+        }
+
+        // Step 2: Find and interact with banker NPC (NOT bank booth - must be NPC for unnoting)
+        // Common banker names: "Banker", "Bank assistant", "Banker tutor"
+        if (!Rs2Widget.isWidgetVisible(14352385)) { // Unnote dialog not open yet
+            // Use noted looting bag on banker
+            if (!Rs2Inventory.isItemSelected()) {
+                Microbot.log("[WildernessNicky] Selecting noted looting bag...");
+                Rs2Inventory.use("Looting bag (noted)");
+                sleep(600);
+                return;
+            } else {
+                // Item selected, now click banker
+                Microbot.log("[WildernessNicky] Using noted bag on banker...");
+                // Try common banker NPCs
+                if (Rs2Npc.interact("Banker", "Use")) {
+                    sleep(1200); // Wait for dialog
+                } else if (Rs2Npc.interact("Bank assistant", "Use")) {
+                    sleep(1200);
+                } else {
+                    Microbot.log("[WildernessNicky] ⚠️ No banker found - will retry");
+                }
+                return;
+            }
+        }
+
+        // Step 3: Dialog should be open - select "Exchange All"
+        if (Rs2Widget.isWidgetVisible(14352385)) {
+            Microbot.log("[WildernessNicky] Selecting 'Exchange All' (pressing 1)");
+            Rs2Keyboard.keyPress('1'); // Option 1 = "Exchange All"
+            sleep(1200); // Wait for unnoting to complete
+
+            // Verify unnoting worked
+            if (Rs2Inventory.hasItem(LOOTING_BAG_CLOSED_ID)) {
+                Microbot.log("[WildernessNicky] ✅ Successfully unnoted looting bag!");
+
+                // Step 4: Auto-open the looting bag
+                Microbot.log("[WildernessNicky] Opening looting bag...");
+                Rs2Inventory.interact(LOOTING_BAG_CLOSED_ID, "Open");
+                sleepUntil(() -> Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID), 2000);
+
+                if (Rs2Inventory.hasItem(LOOTING_BAG_OPEN_ID)) {
+                    Microbot.log("[WildernessNicky] ✅ Looting bag is now open!");
+                } else {
+                    Microbot.log("[WildernessNicky] ⚠️ Failed to open looting bag - user will need to open manually");
+                }
+
+                // Continue with normal startup banking flow
+                currentState = ObstacleState.STARTUP_BANKING;
+            } else {
+                Microbot.log("[WildernessNicky] ⚠️ Unnoting failed - will retry");
+                // Stay in this state to retry
+            }
+        }
+    }
+
+    /**
      * Helper method to check if player is near Grand Exchange
      */
     private boolean isNearGrandExchange() {
@@ -3703,20 +4792,29 @@ public final class WildernessNickyScript extends Script {
         forceBankNextLoot = false;
 
         // MASS MODE: Hop to configured mass world if set
-        if (config.playMode() == WildernessNickyConfig.PlayMode.MASS &&
-            config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+        if (config.playMode() == WildernessNickyConfig.PlayMode.MASS) {
+            int targetMassWorld = -1;
 
-            int targetMassWorld = getConfigWorld(config.massWorld());
-            int currentWorld = Rs2Player.getWorld();
+            // Try custom world list first
+            if (!parsedMassWorlds.isEmpty()) {
+                targetMassWorld = parsedMassWorlds.get(0); // Always use first world for mass mode consistency
+            } else if (config.massWorld() != WildernessNickyConfig.BankWorldOption.Random) {
+                // Fallback to dropdown
+                targetMassWorld = getConfigWorld(config.massWorld());
+            }
 
-            if (currentWorld != targetMassWorld) {
-                Microbot.log("[WildernessNicky] 🌍 MASS MODE: Hopping to configured mass world " + targetMassWorld);
-                if (!attemptWorldHop(targetMassWorld, "mass mode world")) {
-                    return; // Stay in this state to retry
+            if (targetMassWorld > 0) {
+                int currentWorld = Rs2Player.getWorld();
+
+                if (currentWorld != targetMassWorld) {
+                    Microbot.log("[WildernessNicky] 🌍 MASS MODE: Hopping to configured mass world " + targetMassWorld);
+                    if (!attemptWorldHop(targetMassWorld, "mass mode world")) {
+                        return; // Stay in this state to retry
+                    }
+                    Microbot.log("[WildernessNicky] ✅ Successfully hopped to mass world " + targetMassWorld);
+                } else {
+                    Microbot.log("[WildernessNicky] 📌 Already on mass world " + targetMassWorld);
                 }
-                Microbot.log("[WildernessNicky] ✅ Successfully hopped to mass world " + targetMassWorld);
-            } else {
-                Microbot.log("[WildernessNicky] 📌 Already on mass world " + targetMassWorld);
             }
         }
         // NORMAL MODE / SOLO MODE: Swap back to original world if enabled
